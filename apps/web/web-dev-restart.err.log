@@ -1,0 +1,46 @@
+ ⨯ ./src/components/dashboard-shell.tsx
+Error: 
+
+Caused by:
+    0: Failed to read source code from C:\dev lottery\lottery\apps\web\src\components\dashboard-shell.tsx
+    1: The system cannot find the file specified. (os error 2)
+
+Import trace for requested module:
+./src/components/dashboard-shell.tsx
+./src/app/(dashboard)/layout.tsx
+ ⨯ ./src/components/dashboard-shell.tsx
+Error: 
+
+Caused by:
+    0: Failed to read source code from C:\dev lottery\lottery\apps\web\src\components\dashboard-shell.tsx
+    1: The system cannot find the file specified. (os error 2)
+
+Import trace for requested module:
+./src/components/dashboard-shell.tsx
+./src/app/(dashboard)/layout.tsx
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ ⨯ ./src/components/analytics-panel.tsx
+Error: 
+
+Caused by:
+    0: Failed to read source code from C:\dev lottery\lottery\apps\web\src\components\analytics-panel.tsx
+    1: The system cannot find the file specified. (os error 2)
+
+Import trace for requested module:
+./src/components/analytics-panel.tsx
+./src/app/(dashboard)/analytics/page.tsx
+ ⨯ ./src/components/analytics-panel.tsx
+Error: 
+
+Caused by:
+    0: Failed to read source code from C:\dev lottery\lottery\apps\web\src\components\analytics-panel.tsx
+    1: The system cannot find the file specified. (os error 2)
+
+Import trace for requested module:
+./src/components/analytics-panel.tsx
+./src/app/(dashboard)/analytics/page.tsx
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload

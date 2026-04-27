@@ -1,0 +1,8 @@
+2026/04/26-16:39:24.465 7b64 Reusing MANIFEST C:\dev lottery\lottery\apps\wa-worker\.wwebjs_auth\session-session_demo\Default\IndexedDB\https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
+2026/04/26-16:39:24.465 7b64 Recovering log #103
+2026/04/26-16:39:24.466 7b64 Reusing old log C:\dev lottery\lottery\apps\wa-worker\.wwebjs_auth\session-session_demo\Default\IndexedDB\https_web.whatsapp.com_0.indexeddb.leveldb/000103.log 
+2026/04/26-16:39:24.467 7b64 Delete type=2 #102
+2026/04/26-16:39:24.469 81ec Manual compaction at level-0 from '\x00"\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00#\x00\x00\x00' @ 0 : 0; will stop at (end)
+2026/04/26-16:39:24.470 7a48 Manual compaction at level-0 from '\x00!\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00"\x00\x00\x00' @ 0 : 0; will stop at (end)
+2026/04/26-16:39:24.471 81ec Manual compaction at level-1 from '\x00!\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00"\x00\x00\x00' @ 0 : 0; will stop at (end)
+2026/04/26-16:39:24.483 81ec Manual compaction at level-0 from '\x00(\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00)\x00\x00\x00' @ 0 : 0; will stop at (end)

@@ -1,0 +1,394 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum WhatsAppStatus {
+  CONNECTED
+  DISCONNECTED
+}
+
+enum WhatsAppProviderKind {
+  unofficial_qr
+  official_business
+}
+
+enum AccountStatus {
+  pending
+  active
+  suspended
+  rejected
+}
+
+enum GlobalRole {
+  SUPER_ADMIN
+  USER
+}
+
+enum WorkspaceRole {
+  OWNER
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+enum InviteStatus {
+  pending
+  accepted
+  revoked
+  expired
+}
+
+enum ConnectionStatus {
+  idle
+  connecting
+  qr_ready
+  connected
+  disconnected
+  error
+}
+
+enum CampaignType {
+  REFERRAL
+  TRIGGER
+}
+
+enum DrawWeightMode {
+  ONE_PER_PARTICIPANT
+  STORED_TICKETS
+  REFERRALS_HALVED
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+}
+
+enum ParticipantOnboardingState {
+  AWAITING_NAME
+  AWAITING_REFERRER
+  AWAITING_STATUS_PROOF
+  AWAITING_CONTACT_SAVED
+  REGISTERED
+}
+
+enum TemplateInteractiveType {
+  NONE
+  BUTTONS
+  LIST
+}
+
+enum MessageTemplateType {
+  WELCOME
+  REFERRER_PROMPT
+  SAVE_CONTACT_PROMPT
+  REGISTRATION_PAUSED
+  MAIN_MENU
+  LINK
+  JOIN_WHATSAPP_PROMPT
+  STATUS
+  WINNER
+  SELF_STATUS
+  REFERRAL_UPDATE
+  LEADERBOARD_SUMMARY
+}
+
+enum MessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum MessageDeliveryStatus {
+  queued
+  sent
+  failed
+  received
+}
+
+enum ContactDeliveryMode {
+  CONTACT_CARD
+  VCARD_FILE
+}
+
+model Workspace {
+  id                          String               @id @default(cuid())
+  name                        String
+  slug                        String               @unique
+  ownerName                   String?
+  ownerEmail                  String?              @unique
+  accountStatus               AccountStatus        @default(pending)
+  maxCampaigns                Int                  @default(1)
+  monthlyMessageLimit         Int?
+  hasTelegramSupport          Boolean              @default(false)
+  contractSignedAt            DateTime?
+  phoneNumber                 String?
+  whatsappStatus              WhatsAppStatus       @default(DISCONNECTED)
+  googleSubject               String?              @unique
+  googleAccessTokenEncrypted  String?              @db.Text
+  googleRefreshTokenEncrypted String?              @db.Text
+  googleTokenExpiry           DateTime?
+  googleContactTemplate       String               @default("{{name}} - Lottery")
+  createdAt                   DateTime             @default(now())
+  updatedAt                   DateTime             @updatedAt
+  connections                 WhatsAppConnection[]
+  connectionAssignments       WorkspaceConnectionAssignment[]
+  campaigns                   Campaign[]
+  contactSyncLedger           ContactSyncLedger[]
+  members                     WorkspaceMember[]
+  invites                     WorkspaceInvite[]
+  contactCards                WorkspaceContactCard[]
+  messageLogs                 MessageLog[]
+}
+
+model WhatsAppConnection {
+  id           String               @id @default(cuid())
+  workspaceId  String
+  provider     WhatsAppProviderKind
+  label        String
+  status       ConnectionStatus     @default(idle)
+  maxTenants   Int                  @default(3)
+  currentTenants Int                @default(0)
+  batteryLevel Int?
+  qrCode       String?
+  phoneNumber  String?
+  sessionKey   String               @unique
+  officialPhoneNumberId String?
+  officialWabaId        String?
+  officialAccessTokenEncrypted String? @db.Text
+  officialWebhookVerifyTokenEncrypted String? @db.Text
+  lastError    String?
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  workspace    Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  assignments  WorkspaceConnectionAssignment[]
+  campaigns    Campaign[]
+  messageLogs  MessageLog[]
+
+  @@index([workspaceId])
+  @@index([provider])
+  @@index([status])
+}
+
+model Campaign {
+  id                   String              @id @default(cuid())
+  workspaceId          String
+  connectionId         String
+  name                 String
+  slug                 String              @unique
+  type                 CampaignType
+  triggerWord          String?
+  drawDate             DateTime?
+  drawWeightMode       DrawWeightMode      @default(ONE_PER_PARTICIPANT)
+  contactTagName       String              @default("Lottery_Campaign_1")
+  googleContactGroupResourceName String?
+  statusCommandAliases String[]
+  isActive             Boolean             @default(true)
+  messageCount         Int                 @default(0)
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+  workspace            Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  connection           WhatsAppConnection  @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  participants         Participant[]
+  templates            MessageTemplate[]
+  winnerDraws          WinnerDraw[]
+  messageLogs          MessageLog[]
+
+  @@index([workspaceId])
+  @@index([connectionId])
+  @@index([type])
+  @@index([triggerWord])
+}
+
+model Participant {
+  id                   String                     @id @default(cuid())
+  campaignId           String
+  phone                String
+  chatAddress          String?
+  name                 String?
+  referralCode         String
+  referralLink         String
+  referrerId           String?
+  onboardingState      ParticipantOnboardingState @default(REGISTERED)
+  contactSavedConfirmed Boolean                   @default(true)
+  statusProofReceived  Boolean                    @default(false)
+  statusProofMediaUrl  String?                    @db.Text
+  pendingReferralCode  String?
+  pendingReferrerPhone String?
+  tickets              Int                        @default(1)
+  referralsCount       Int                        @default(0)
+  createdAt            DateTime                   @default(now())
+  updatedAt            DateTime                   @updatedAt
+  campaign             Campaign                   @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  referrer             Participant?               @relation("ParticipantReferrals", fields: [referrerId], references: [id], onDelete: SetNull)
+  referrals            Participant[]              @relation("ParticipantReferrals")
+  winnerDraws          WinnerDraw[]
+  messageLogs          MessageLog[]
+
+  @@unique([campaignId, phone])
+  @@unique([campaignId, referralCode])
+  @@index([campaignId])
+  @@index([campaignId, chatAddress])
+  @@index([referrerId])
+}
+
+model User {
+  id            String        @id @default(cuid())
+  email         String        @unique
+  name          String?
+  passwordHash  String?
+  accountStatus AccountStatus @default(pending)
+  globalRole    GlobalRole    @default(USER)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  memberships   WorkspaceMember[]
+  invitesSent   WorkspaceInvite[] @relation("InviteSender")
+
+  @@index([accountStatus])
+  @@index([globalRole])
+}
+
+model WorkspaceMember {
+  id          String        @id @default(cuid())
+  workspaceId String
+  userId      String
+  role        WorkspaceRole @default(VIEWER)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@index([workspaceId])
+  @@index([userId])
+  @@index([role])
+}
+
+model WorkspaceInvite {
+  id          String       @id @default(cuid())
+  workspaceId String
+  email       String
+  role        WorkspaceRole
+  status      InviteStatus @default(pending)
+  tokenHash   String       @unique
+  invitedByUserId String?
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  workspace   Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  invitedBy   User?        @relation("InviteSender", fields: [invitedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId])
+  @@index([email])
+  @@index([status])
+}
+
+model WorkspaceConnectionAssignment {
+  id           String             @id @default(cuid())
+  workspaceId  String
+  connectionId String
+  assignedByUserId String?
+  createdAt    DateTime           @default(now())
+  workspace     Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  connection    WhatsAppConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, connectionId])
+  @@index([workspaceId])
+  @@index([connectionId])
+}
+
+model WorkspaceContactCard {
+  id          String      @id @default(cuid())
+  workspaceId String
+  displayName String
+  phone       String
+  organization String?
+  sortOrder   Int         @default(0)
+  isEnabled   Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  workspace   Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([isEnabled])
+}
+
+model MessageLog {
+  id                String                @id @default(cuid())
+  workspaceId       String
+  campaignId        String?
+  connectionId      String
+  participantId     String?
+  direction         MessageDirection
+  status            MessageDeliveryStatus @default(queued)
+  providerMessageId String?
+  body              String?               @db.Text
+  errorMessage      String?               @db.Text
+  createdAt         DateTime              @default(now())
+  sentAt            DateTime?
+  workspace         Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  campaign          Campaign?             @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  connection        WhatsAppConnection    @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  participant       Participant?          @relation(fields: [participantId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, createdAt])
+  @@index([campaignId, createdAt])
+  @@index([connectionId, createdAt])
+  @@index([direction, status])
+}
+
+model MessageTemplate {
+  id         String                  @id @default(cuid())
+  campaignId String
+  type       MessageTemplateType
+  label      String?
+  /// WhatsApp template content with placeholders like {{name}}, {{tickets}}, {{link}}
+  content    String                  @db.Text
+  isEnabled  Boolean                 @default(true)
+  mediaUrl   String?                 @db.Text
+  mediaType  MediaType?
+  interactiveType TemplateInteractiveType @default(NONE)
+  interactiveData Json?
+  createdAt  DateTime                @default(now())
+  updatedAt  DateTime                @updatedAt
+  campaign   Campaign                @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, type])
+  @@index([campaignId])
+}
+
+model ContactSyncLedger {
+  id                       String    @id @default(cuid())
+  workspaceId              String
+  phone                    String
+  displayName              String
+  googlePersonResourceName String?
+  lastCampaignId           String?
+  syncedAt                 DateTime?
+  lastCheckedAt            DateTime  @default(now())
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+  workspace                Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, phone])
+  @@index([workspaceId])
+  @@index([lastCampaignId])
+}
+
+model WinnerDraw {
+  id               String      @id @default(cuid())
+  campaignId       String
+  participantId    String
+  participantName  String
+  participantPhone String
+  createdAt        DateTime    @default(now())
+  campaign         Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  participant      Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId])
+  @@index([participantId])
+}

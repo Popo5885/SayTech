@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: lottery-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: lottery_db
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin123
+    ports:
+      - "5432:5432"
+    volumes:
+      - lottery_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  lottery_postgres_data:

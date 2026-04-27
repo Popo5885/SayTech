@@ -1,0 +1,12 @@
+.next
+node_modules
+dist
+.turbo
+.env
+.env.local
+.pnpm-store
+coverage
+packages/db/generated
+apps/web/.next
+apps/web/.vercel
+apps/wa-worker/dist

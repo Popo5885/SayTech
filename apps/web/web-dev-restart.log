@@ -1,0 +1,165 @@
+
+> @lottery/web@0.1.0 dev
+> next dev
+
+   ▲ Next.js 15.5.15
+   - Local:        http://localhost:3000
+   - Network:      http://192.168.1.181:3000
+
+ ✓ Starting...
+ ✓ Ready in 1348ms
+ ○ Compiling /connections ...
+ ✓ Compiled /connections in 13s (804 modules)
+ GET /connections 200 in 15286ms
+ ○ Compiling /api/connections/[connectionId]/status ...
+ ✓ Compiled /api/connections/[connectionId]/status in 1407ms (806 modules)
+ GET /connections 200 in 471ms
+ GET /api/connections/connection_demo/status 200 in 2028ms
+ ○ Compiling / ...
+ ✓ Compiled / in 3.1s (810 modules)
+ GET /connections 200 in 1731ms
+ GET / 200 in 4984ms
+ GET /api/connections/connection_demo/status 200 in 106ms
+ GET /api/connections/connection_demo/status 200 in 79ms
+ ○ Compiling /api/campaigns/[campaignId]/live ...
+ ✓ Compiled /messages in 3.9s (829 modules)
+ GET /api/connections/connection_demo/status 200 in 4601ms
+ GET /api/campaigns/campaign_spring/live 200 in 4662ms
+ GET /api/connections/connection_demo/status 200 in 141ms
+ GET /contacts 200 in 4375ms
+ GET /messages 200 in 4215ms
+ ○ Compiling /analytics ...
+ ✓ Compiled /analytics in 1389ms (841 modules)
+ GET /analytics 200 in 2531ms
+ ○ Compiling /join/[slug] ...
+ ✓ Compiled /join/[slug] in 1015ms (851 modules)
+ GET /join/spring-lottery?ref=8DMD6CN8 200 in 2288ms
+ GET /messages 200 in 243ms
+ GET /api/connections/connection_demo/status 200 in 97ms
+ GET /api/campaigns/campaign_spring/live 200 in 78ms
+ ○ Compiling /api/public/[slug] ...
+ ✓ Compiled /api/public/[slug] in 694ms (853 modules)
+ GET /api/public/spring-lottery 200 in 1287ms
+ GET /analytics 200 in 264ms
+ GET /analytics 200 in 624ms
+ ✓ Compiled in 1023ms (518 modules)
+ GET /analytics 200 in 499ms
+ ✓ Compiled in 805ms (518 modules)
+ GET /analytics 200 in 327ms
+ ✓ Compiled in 1846ms (835 modules)
+ GET /analytics 200 in 415ms
+ ✓ Compiled in 430ms (518 modules)
+ GET /analytics 200 in 325ms
+ ✓ Compiled in 1225ms (518 modules)
+ GET /analytics 200 in 298ms
+ ✓ Compiled in 1131ms (835 modules)
+ GET /analytics 200 in 421ms
+ ✓ Compiled in 354ms (317 modules)
+ ✓ Compiled in 353ms (317 modules)
+ GET /analytics 200 in 502ms
+ GET /analytics 200 in 157ms
+ ✓ Compiled in 594ms (317 modules)
+ GET /analytics 200 in 190ms
+ ✓ Compiled in 296ms (310 modules)
+ GET /analytics 200 in 116ms
+ ✓ Compiled in 279ms (310 modules)
+ ✓ Compiled in 330ms (310 modules)
+ GET /analytics 200 in 346ms
+ GET /analytics 200 in 142ms
+ ✓ Compiled in 205ms (310 modules)
+ GET /analytics 200 in 1083ms
+ ✓ Compiled in 2.3s (814 modules)
+ GET /analytics 200 in 1980ms
+ GET /analytics 200 in 134ms
+ ✓ Compiled in 186ms (310 modules)
+ GET /analytics 200 in 332ms
+ ✓ Compiled in 861ms (828 modules)
+ GET /analytics 200 in 880ms
+ GET /analytics 200 in 136ms
+ ✓ Compiled in 1845ms (814 modules)
+ GET /analytics 200 in 719ms
+ GET /analytics 200 in 126ms
+ ✓ Compiled in 206ms (310 modules)
+ GET /analytics 200 in 311ms
+ ✓ Compiled in 805ms (828 modules)
+ GET /analytics 200 in 752ms
+ GET /analytics 200 in 112ms
+ ✓ Compiled in 180ms (310 modules)
+ GET /analytics 200 in 208ms
+ ✓ Compiled in 714ms (814 modules)
+ GET /analytics 200 in 787ms
+ GET /analytics 200 in 128ms
+ ✓ Compiled in 2.4s (828 modules)
+ GET /analytics 200 in 2368ms
+ GET /analytics 200 in 114ms
+ ✓ Compiled in 353ms (295 modules)
+ ○ Compiling /_error ...
+ GET /analytics 500 in 8923ms
+ GET /analytics 500 in 45ms
+ GET /analytics 500 in 44ms
+ GET /analytics 500 in 42ms
+ GET /analytics 500 in 35ms
+ ✓ Compiled /_error in 3s (1181 modules)
+ GET /analytics 200 in 1221ms
+ GET /analytics 200 in 406ms
+ ✓ Compiled in 979ms (465 modules)
+ GET /analytics 200 in 102ms
+ ✓ Compiled in 766ms (465 modules)
+ GET /analytics 200 in 235ms
+ ✓ Compiled in 242ms (465 modules)
+ ✓ Compiled in 518ms (465 modules)
+ GET /analytics 200 in 533ms
+ GET /analytics 200 in 116ms
+ ✓ Compiled in 915ms (464 modules)
+ ✓ Compiled in 312ms (464 modules)
+ GET /analytics 200 in 472ms
+ GET /analytics 200 in 127ms
+ ○ Compiling /_error ...
+ GET /analytics 500 in 2283ms
+ GET /analytics 500 in 76ms
+ GET /analytics 500 in 36ms
+ ✓ Compiled /_error in 2.3s (1187 modules)
+ GET /analytics 200 in 618ms
+ GET /analytics 200 in 1904ms
+ ✓ Compiled in 2.7s (1091 modules)
+ GET /analytics 200 in 1721ms
+ ✓ Compiled in 1012ms (1091 modules)
+ GET /analytics 200 in 354ms
+ ✓ Compiled in 760ms (1091 modules)
+ GET /analytics 200 in 208ms
+ ✓ Compiled in 3s (1099 modules)
+ ✓ Compiled in 373ms (471 modules)
+ GET /analytics 200 in 457ms
+ GET /analytics 200 in 93ms
+ ✓ Compiled in 1141ms (471 modules)
+ GET /analytics 200 in 120ms
+ ✓ Compiled in 229ms (471 modules)
+ GET /analytics 200 in 99ms
+ GET /analytics 200 in 122ms
+ ✓ Compiled in 237ms (471 modules)
+ GET /analytics 200 in 118ms
+ GET /analytics 200 in 558ms
+ ✓ Compiled in 1720ms (1085 modules)
+ GET /analytics 200 in 309ms
+ ✓ Compiled in 1205ms (1099 modules)
+ GET /analytics 200 in 752ms
+ ✓ Compiled in 666ms (1099 modules)
+ GET /analytics 200 in 1123ms
+ ✓ Compiled in 260ms (471 modules)
+ GET /analytics 200 in 120ms
+ ✓ Compiled in 881ms (471 modules)
+ GET /analytics 200 in 127ms
+ ✓ Compiled in 753ms (1087 modules)
+ GET /analytics 200 in 214ms
+ ✓ Compiled in 663ms (965 modules)
+ GET /analytics 200 in 192ms
+ ✓ Compiled in 2.2s (935 modules)
+ GET /analytics 200 in 176ms
+ ○ Compiling /dashboard/analytics ...
+ ✓ Compiled /dashboard/analytics in 1544ms (969 modules)
+ GET /dashboard/analytics 200 in 2087ms
+ GET /dashboard/analytics 200 in 148ms
+ ✓ Compiled in 2.1s (546 modules)
+ GET /dashboard/analytics 200 in 289ms
+ ✓ Compiled in 681ms (544 modules)
+ GET /dashboard/analytics 200 in 242ms

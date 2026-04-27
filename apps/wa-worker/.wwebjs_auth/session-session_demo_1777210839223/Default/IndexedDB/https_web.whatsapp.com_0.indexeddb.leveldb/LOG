@@ -1,0 +1,14 @@
+2026/04/26-22:02:11.343 52c8 Reusing MANIFEST C:\dev lottery\lottery\apps\wa-worker\.wwebjs_auth\session-session_demo_1777210839223\Default\IndexedDB\https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
+2026/04/26-22:02:11.349 52c8 Recovering log #4712
+2026/04/26-22:02:11.358 52c8 Reusing old log C:\dev lottery\lottery\apps\wa-worker\.wwebjs_auth\session-session_demo_1777210839223\Default\IndexedDB\https_web.whatsapp.com_0.indexeddb.leveldb/004712.log 
+2026/04/26-22:02:52.310 8514 Level-0 table #4718: started
+2026/04/26-22:02:52.315 8514 Level-0 table #4718: 15048 bytes OK
+2026/04/26-22:02:52.319 8514 Delete type=0 #4712
+2026/04/26-22:02:52.321 8514 Manual compaction at level-0 from '\x00'\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00(\x00\x00\x00' @ 0 : 0; will stop at '\x00-\x00\x00\x05' @ 13327910 : 1
+2026/04/26-22:02:52.321 8514 Compacting 1@0 + 2@1 files
+2026/04/26-22:02:52.336 8514 Generated table #4719@0: 10470 keys, 86092 bytes
+2026/04/26-22:02:52.339 8514 Generated table #4720@0: 30 keys, 546 bytes
+2026/04/26-22:02:52.339 8514 Compacted 1@0 + 2@1 files => 86638 bytes
+2026/04/26-22:02:52.340 8514 compacted to: files[ 0 2 42 0 0 0 0 ]
+2026/04/26-22:02:52.341 8514 Delete type=2 #4718
+2026/04/26-22:02:52.341 8514 Manual compaction at level-0 from '\x00-\x00\x00\x05' @ 13327910 : 1 .. '\x00(\x00\x00\x00' @ 0 : 0; will stop at (end)
