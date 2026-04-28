@@ -1,6 +1,6 @@
 import { AnalyticsPanel } from "../../../components/analytics-panel";
 import { EmptyWorkspaceState } from "../../../components/empty-workspace-state";
-import { getDashboardStats, getPrimaryStore } from "../../../lib/demo-store";
+import { getDashboardStats, getPrimaryStore } from "../../../lib/live-store";
 
 export default async function DashboardAnalyticsPage() {
   const store = await getPrimaryStore();

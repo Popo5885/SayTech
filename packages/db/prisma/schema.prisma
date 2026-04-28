@@ -43,6 +43,16 @@ enum InviteStatus {
   expired
 }
 
+enum WorkspaceNumberPoolStatus {
+  waiting
+  assigned
+}
+
+enum WorkspaceConnectionAssignmentStatus {
+  active
+  released
+}
+
 enum ConnectionStatus {
   idle
   connecting
@@ -114,6 +124,31 @@ enum ContactDeliveryMode {
   VCARD_FILE
 }
 
+enum ContactLeadStatus {
+  open
+  converted
+  closed
+}
+
+enum EmailTemplateKind {
+  PENDING_USER
+  OWNER_APPROVAL
+  APPROVED_USER
+  REJECTED_USER
+  RESET_CODE
+  CONTACT_LEAD_USER
+  CONTACT_LEAD_OWNER
+  NEWSLETTER
+}
+
+enum EmailDeliveryStatus {
+  draft
+  queued
+  sent
+  failed
+  skipped
+}
+
 model Workspace {
   id                          String               @id @default(cuid())
   name                        String
@@ -132,6 +167,9 @@ model Workspace {
   googleRefreshTokenEncrypted String?              @db.Text
   googleTokenExpiry           DateTime?
   googleContactTemplate       String               @default("{{name}} - Lottery")
+  numberPoolStatus            WorkspaceNumberPoolStatus @default(waiting)
+  onboardingTourStep          Int                  @default(0)
+  onboardingTourCompletedAt   DateTime?
   createdAt                   DateTime             @default(now())
   updatedAt                   DateTime             @updatedAt
   connections                 WhatsAppConnection[]
@@ -236,19 +274,32 @@ model Participant {
 }
 
 model User {
-  id            String        @id @default(cuid())
-  email         String        @unique
-  name          String?
-  passwordHash  String?
-  accountStatus AccountStatus @default(pending)
-  globalRole    GlobalRole    @default(USER)
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  memberships   WorkspaceMember[]
-  invitesSent   WorkspaceInvite[] @relation("InviteSender")
+  id                  String        @id @default(cuid())
+  email               String        @unique
+  name                String?
+  fullName            String?
+  phone               String?
+  passwordHash        String?
+  accountStatus       AccountStatus @default(pending)
+  globalRole          GlobalRole    @default(USER)
+  googleSubject       String?       @unique
+  acceptedTermsAt     DateTime?
+  acceptedPrivacyAt   DateTime?
+  approvedAt          DateTime?
+  rejectedAt          DateTime?
+  suspendedAt         DateTime?
+  lastLoginAt         DateTime?
+  emailUnsubscribedAt DateTime?
+  unsubscribeToken    String        @unique @default(cuid())
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  memberships         WorkspaceMember[]
+  invitesSent         WorkspaceInvite[] @relation("InviteSender")
+  passwordResetTokens PasswordResetToken[]
 
   @@index([accountStatus])
   @@index([globalRole])
+  @@index([phone])
 }
 
 model WorkspaceMember {
@@ -291,7 +342,10 @@ model WorkspaceConnectionAssignment {
   id           String             @id @default(cuid())
   workspaceId  String
   connectionId String
+  status       WorkspaceConnectionAssignmentStatus @default(active)
   assignedByUserId String?
+  assignedAt   DateTime           @default(now())
+  releasedAt   DateTime?
   createdAt    DateTime           @default(now())
   workspace     Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   connection    WhatsAppConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
@@ -299,6 +353,8 @@ model WorkspaceConnectionAssignment {
   @@unique([workspaceId, connectionId])
   @@index([workspaceId])
   @@index([connectionId])
+  @@index([workspaceId, status])
+  @@index([connectionId, status])
 }
 
 model WorkspaceContactCard {
@@ -377,6 +433,78 @@ model ContactSyncLedger {
   @@unique([workspaceId, phone])
   @@index([workspaceId])
   @@index([lastCampaignId])
+}
+
+model ContactLead {
+  id              String            @id @default(cuid())
+  fullName        String
+  email           String
+  phone           String?
+  message         String?           @db.Text
+  acceptedTermsAt DateTime?
+  acceptedPrivacyAt DateTime?
+  status          ContactLeadStatus @default(open)
+  convertedUserId String?
+  closedAt        DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@index([email])
+  @@index([phone])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  codeHash  String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model EmailTemplate {
+  id        String            @id @default(cuid())
+  kind      EmailTemplateKind @unique
+  subject   String
+  body      String            @db.Text
+  isEnabled Boolean           @default(true)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+}
+
+model EmailBroadcast {
+  id          String              @id @default(cuid())
+  subject     String
+  body        String              @db.Text
+  audience    String              @default("active_users")
+  status      EmailDeliveryStatus @default(draft)
+  sentAt      DateTime?
+  createdById String?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+model AdminAuditLog {
+  id           String   @id @default(cuid())
+  actorUserId  String?
+  action       String
+  targetType   String
+  targetId     String?
+  metadata     Json?
+  createdAt    DateTime @default(now())
+
+  @@index([actorUserId])
+  @@index([targetType, targetId])
+  @@index([createdAt])
 }
 
 model WinnerDraw {

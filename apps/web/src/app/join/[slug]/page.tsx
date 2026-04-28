@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { renderTemplate } from "@lottery/core/templates";
 import { Badge, Card, CardDescription, CardTitle } from "@lottery/ui";
-import { getPublicCampaign } from "../../../lib/demo-store";
+import { getPublicCampaign } from "../../../lib/live-store";
 
 export const dynamic = "force-dynamic";
 
@@ -22,8 +22,8 @@ function buildWhatsAppLink(
   }
 
   const defaultBody = referralToken
-    ? "היי, הגעתי דרך הקישור להצטרפות ל{{campaign_name}}. קוד ההפניה שלי הוא {{ref}}."
-    : "היי, הגעתי כדי להצטרף ל{{campaign_name}}.";
+    ? "היי, אשמח להצטרף ל{{campaign_name}}. הגעתי דרך {{ref}}."
+    : "היי, אשמח להצטרף ל{{campaign_name}}.";
 
   let body = renderTemplate(joinPrefillTemplate?.trim() || defaultBody, {
     name: "",
@@ -37,7 +37,7 @@ function buildWhatsAppLink(
     ref: referralToken ?? ""
   }).trim();
 
-  if (referralToken && !/ref\s*[:=]/i.test(body) && !body.includes(referralToken)) {
+  if (referralToken && !body.includes(referralToken)) {
     body = `${body} ref=${referralToken}`.trim();
   }
 
@@ -68,20 +68,19 @@ export default async function PublicCampaignPage({
 
     return (
       <main
-        className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(251,146,60,0.22),_transparent_35%),linear-gradient(180deg,_#fff9ef_0%,_#fff_100%)] px-4 py-10"
+        className="min-h-screen bg-[linear-gradient(180deg,_#fff9ef_0%,_#fff_55%,_#f8fafc_100%)] px-4 py-10"
         dir="rtl"
       >
         <div className="mx-auto max-w-5xl space-y-6">
           <Card className="overflow-hidden border-orange-200 bg-gradient-to-br from-white via-orange-50 to-amber-50">
             <Badge tone="warning">עמוד הצטרפות</Badge>
             <CardTitle className="mt-4 text-4xl">{data.campaign.name}</CardTitle>
-            <CardDescription className="mt-4 max-w-2xl text-base">
-              מצטרפים להגרלה, משתפים חברים, ורואים כמה משתתפים כבר בפנים. הדירוג הציבורי
-              מוצג בצורה אנונימית בלבד.
+            <CardDescription className="mt-4 max-w-2xl text-base leading-7">
+              מצטרפים להגרלה דרך WhatsApp. המערכת תשמור את ההצטרפות ותיצור קישור אישי לשיתוף.
             </CardDescription>
             {ref ? (
               <div className="mt-5 rounded-2xl border border-orange-200 bg-white/80 px-4 py-3 text-sm text-stone-700">
-                זוהה קוד הפניה: <span className="font-semibold">{ref}</span>
+                קוד ההפניה שלך: <span className="font-semibold">{ref}</span>
               </div>
             ) : null}
             {whatsappLink ? (
@@ -95,32 +94,38 @@ export default async function PublicCampaignPage({
               </a>
             ) : (
               <div className="mt-6 rounded-2xl border border-dashed border-stone-300 bg-white/80 px-4 py-3 text-sm text-stone-600">
-                עדיין אין מספר וואטסאפ פעיל לחיבור אוטומטי.
+                עדיין לא חובר WhatsApp להגרלה הזו.
               </div>
             )}
           </Card>
 
           <div className="grid gap-6 md:grid-cols-[0.8fr_1.2fr]">
             <Card className="space-y-3">
-              <p className="text-xs uppercase tracking-[0.22em] text-stone-500">משתתפים</p>
+              <p className="text-xs font-semibold text-stone-500">משתתפים</p>
               <p className="text-5xl font-semibold text-stone-950">{data.totalParticipants}</p>
               <p className="text-sm leading-6 text-stone-600">
-                הנתון נשלף מהמסד בזמן אמת. מספרי טלפון נשארים פרטיים.
+                מוצגים רק משתתפים שנשמרו באמת במערכת. מספרי טלפון נשארים פרטיים.
               </p>
             </Card>
 
             <Card className="space-y-4">
               <CardTitle>המובילים כרגע</CardTitle>
-              {data.leaderboard.map((entry) => (
-                <div
-                  key={entry.participantId}
-                  className="grid grid-cols-[54px_1fr_auto] items-center gap-4 rounded-3xl border border-stone-200 bg-stone-50 px-4 py-3"
-                >
-                  <span className="text-sm font-semibold text-stone-500">#{entry.rank}</span>
-                  <span className="text-sm font-medium text-stone-900">{entry.anonymizedName}</span>
-                  <span className="text-sm text-stone-600">{entry.referralsCount} הפניות</span>
+              {data.leaderboard.length > 0 ? (
+                data.leaderboard.map((entry) => (
+                  <div
+                    key={entry.participantId}
+                    className="grid grid-cols-[54px_1fr_auto] items-center gap-4 rounded-3xl border border-stone-200 bg-stone-50 px-4 py-3"
+                  >
+                    <span className="text-sm font-semibold text-stone-500">#{entry.rank}</span>
+                    <span className="text-sm font-medium text-stone-900">{entry.anonymizedName}</span>
+                    <span className="text-sm text-stone-600">{entry.referralsCount} הפניות</span>
+                  </div>
+                ))
+              ) : (
+                <div className="rounded-3xl border border-dashed border-stone-300 bg-stone-50 px-4 py-8 text-center text-sm text-stone-500">
+                  עדיין אין משתתפים
                 </div>
-              ))}
+              )}
             </Card>
           </div>
         </div>

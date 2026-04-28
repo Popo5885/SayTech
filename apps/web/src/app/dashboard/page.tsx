@@ -4,7 +4,7 @@ import {
   getConnectionSnapshot,
   getDashboardStats,
   getPrimaryStore
-} from "../../lib/demo-store";
+} from "../../lib/live-store";
 
 export default async function DashboardPage() {
   const store = await getPrimaryStore();

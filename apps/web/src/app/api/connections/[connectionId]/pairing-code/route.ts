@@ -1,10 +1,18 @@
 import { NextResponse } from "next/server";
+import { assertAdminConnectionAccess } from "../../../../../lib/live-store";
 
 export async function POST(
   request: Request,
   context: { params: Promise<{ connectionId: string }> }
 ) {
   const { connectionId } = await context.params;
+
+  try {
+    await assertAdminConnectionAccess(connectionId);
+  } catch {
+    return NextResponse.json({ error: "קוד התאמה זמין לצוות הניהול בלבד." }, { status: 403 });
+  }
+
   const { phone } = (await request.json()) as { phone?: string };
   const workerUrl = process.env.WA_WORKER_HTTP_URL?.replace(/\/$/, "");
 
@@ -16,7 +24,7 @@ export async function POST(
     return NextResponse.json(
       {
         error:
-          "קוד התאמה מופק רק דרך ה-Worker החי. הגדירו WA_WORKER_HTTP_URL כדי לחבר את הפעולה."
+          "קוד התאמה מופק רק כששירות החיבור פעיל. פנו לצוות Magic Flow להפעלת החיבור."
       },
       { status: 503 }
     );
@@ -33,7 +41,7 @@ export async function POST(
     return NextResponse.json(data, { status: response.status });
   } catch {
     return NextResponse.json(
-      { error: "לא הצלחנו ליצור קשר עם ה-Worker להפקת קוד התאמה." },
+      { error: "לא הצלחנו ליצור קשר עם שירות החיבור להפקת קוד התאמה." },
       { status: 502 }
     );
   }

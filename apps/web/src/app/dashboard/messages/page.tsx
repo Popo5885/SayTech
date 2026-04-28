@@ -1,6 +1,6 @@
 import { EmptyWorkspaceState } from "../../../components/empty-workspace-state";
 import { MessageEditor } from "../../../components/message-editor";
-import { getConnectionSnapshot, getPrimaryStore, getTemplates } from "../../../lib/demo-store";
+import { getConnectionSnapshot, getPrimaryStore, getTemplates } from "../../../lib/live-store";
 
 export default async function DashboardMessagesPage() {
   const store = await getPrimaryStore();
@@ -8,8 +8,8 @@ export default async function DashboardMessagesPage() {
   if (!store) {
     return (
       <EmptyWorkspaceState
-        title="אין קמפיין לעריכת הודעות"
-        description="עורך ה-Magic Flow יוצג אחרי יצירת Workspace וקמפיין אמיתי במסד הנתונים."
+        title="אין הגרלה לעריכת הודעות"
+        description="אחרי יצירת הגרלה אמיתית, עורך ה-Magic Flow יופיע כאן."
       />
     );
   }

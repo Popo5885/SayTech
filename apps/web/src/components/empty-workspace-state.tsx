@@ -2,7 +2,7 @@ import { Card, CardDescription, CardTitle } from "@lottery/ui";
 
 export function EmptyWorkspaceState({
   title = "עדיין אין סביבת עבודה פעילה",
-  description = "המסך הזה מציג רק נתונים אמיתיים. ברגע שיוגדר Workspace, חיבור WhatsApp וקמפיין במסד הנתונים, הנתונים יופיעו כאן."
+  description = "המסך הזה מציג רק נתונים אמיתיים. ברגע שצוות הניהול יפעיל סביבת עבודה, חיבור וקמפיין, הנתונים יופיעו כאן."
 }: {
   title?: string;
   description?: string;
@@ -15,8 +15,7 @@ export function EmptyWorkspaceState({
       <CardTitle>{title}</CardTitle>
       <CardDescription className="text-base leading-7">{description}</CardDescription>
       <div className="rounded-3xl border border-dashed border-stone-300 bg-stone-50 p-5 text-sm leading-7 text-stone-600">
-        כדי להתחיל, מנהל המערכת צריך לאשר חשבון, ליצור Workspace, לשייך חיבור WhatsApp
-        ולהגדיר קמפיין אחד לפחות.
+        כדי להתחיל, צוות הניהול צריך לאשר חשבון, לשייך חיבור ולהגדיר הגרלה אחת לפחות.
       </div>
     </Card>
   );

@@ -1,6 +1,5 @@
 import { prisma } from "@lottery/db";
 import { decryptSecret, encryptSecret } from "./crypto";
-import { createDemoStore } from "./demo-data";
 import {
   type Campaign,
   type CampaignLiveState,
@@ -77,6 +76,11 @@ function mapWorkspace(record: any): Workspace {
     contractSignedAt: record.contractSignedAt ? record.contractSignedAt.toISOString() : null,
     phoneNumber: record.phoneNumber,
     whatsappStatus: record.whatsappStatus,
+    numberPoolStatus: record.numberPoolStatus ?? "waiting",
+    onboardingTourStep: record.onboardingTourStep ?? 0,
+    onboardingTourCompletedAt: record.onboardingTourCompletedAt
+      ? record.onboardingTourCompletedAt.toISOString()
+      : null,
     createdAt: record.createdAt.toISOString()
   };
 }
@@ -245,147 +249,6 @@ export interface GoogleSyncAccount {
   contactTemplate: string;
 }
 
-export async function bootstrapDevelopmentData(baseUrl: string): Promise<void> {
-  const demo = createDemoStore(baseUrl);
-
-  await db.workspace.upsert({
-    where: {
-      id: demo.workspace.id
-    },
-    update: {
-      name: demo.workspace.name,
-      slug: demo.workspace.slug,
-      ownerName: demo.workspace.ownerName,
-      ownerEmail: demo.workspace.ownerEmail,
-      phoneNumber: demo.workspace.phoneNumber,
-      googleContactTemplate: "{{name}} - Lottery"
-    },
-    create: {
-      id: demo.workspace.id,
-      name: demo.workspace.name,
-      slug: demo.workspace.slug,
-      ownerName: demo.workspace.ownerName,
-      ownerEmail: demo.workspace.ownerEmail,
-      phoneNumber: demo.workspace.phoneNumber,
-      whatsappStatus: "DISCONNECTED",
-      googleContactTemplate: "{{name}} - Lottery"
-    }
-  });
-
-  await db.whatsAppConnection.upsert({
-    where: {
-      id: demo.connection.id
-    },
-    update: {
-      workspaceId: demo.workspace.id,
-      provider: demo.connection.provider,
-      label: demo.connection.label
-    },
-    create: {
-      id: demo.connection.id,
-      workspaceId: demo.workspace.id,
-      provider: demo.connection.provider,
-      label: demo.connection.label,
-      status: demo.connection.status,
-      batteryLevel: demo.connection.batteryLevel,
-      qrCode: demo.connection.qrCode,
-      phoneNumber: demo.connection.phoneNumber,
-      sessionKey: demo.connection.sessionKey,
-      lastError: demo.connection.lastError
-    }
-  });
-
-  await db.campaign.upsert({
-    where: {
-      id: demo.campaign.id
-    },
-    update: {
-      workspaceId: demo.workspace.id,
-      connectionId: demo.connection.id,
-      name: demo.campaign.name,
-      slug: demo.campaign.slug,
-      type: modeToCampaignType(demo.campaign.mode),
-      triggerWord: demo.campaign.triggerWord,
-      drawDate: demo.campaign.drawDate ? new Date(demo.campaign.drawDate) : null,
-      drawWeightMode: demo.campaign.drawWeightMode,
-      contactTagName: demo.campaign.contactTagName,
-      googleContactGroupResourceName: demo.campaign.googleContactGroupResourceName,
-      statusCommandAliases: demo.campaign.statusCommandAliases,
-      isActive: demo.campaign.isActive
-    },
-    create: {
-      id: demo.campaign.id,
-      workspaceId: demo.workspace.id,
-      connectionId: demo.connection.id,
-      name: demo.campaign.name,
-      slug: demo.campaign.slug,
-      type: modeToCampaignType(demo.campaign.mode),
-      triggerWord: demo.campaign.triggerWord,
-      drawDate: demo.campaign.drawDate ? new Date(demo.campaign.drawDate) : null,
-      drawWeightMode: demo.campaign.drawWeightMode,
-      contactTagName: demo.campaign.contactTagName,
-      googleContactGroupResourceName: demo.campaign.googleContactGroupResourceName,
-      statusCommandAliases: demo.campaign.statusCommandAliases,
-      isActive: demo.campaign.isActive,
-      messageCount: demo.totalMessagesSent
-    }
-  });
-
-  const existingTemplateCount = await db.messageTemplate.count({
-    where: {
-      campaignId: demo.campaign.id
-    }
-  });
-
-  if (existingTemplateCount === 0) {
-    for (const template of demo.campaign.templates) {
-      await db.messageTemplate.create({
-        data: {
-          id: template.id,
-          campaignId: demo.campaign.id,
-          type: keyToTemplateType(template.key),
-          label: template.label,
-          content: template.value,
-          isEnabled: template.isEnabled,
-          mediaUrl: template.mediaUrl,
-          mediaType: template.mediaType,
-          interactiveType: template.interactive?.kind ?? "NONE",
-          interactiveData: template.interactive ?? null
-        }
-      });
-    }
-  }
-
-  const existingParticipantCount = await db.participant.count({
-    where: {
-      campaignId: demo.campaign.id
-    }
-  });
-
-  if (existingParticipantCount === 0) {
-    for (const participant of demo.participants) {
-      await db.participant.create({
-        data: {
-          id: participant.id,
-          campaignId: participant.campaignId,
-          phone: participant.phone,
-          chatAddress: participant.chatAddress,
-          name: participant.name,
-          referralCode: participant.referralToken,
-          referralLink: participant.referralLink,
-          referrerId: participant.referredByParticipantId,
-          tickets: participant.tickets,
-          referralsCount: participant.referralsCount,
-          onboardingState: "REGISTERED",
-          contactSavedConfirmed: true,
-          pendingReferralCode: null,
-          pendingReferrerPhone: null
-        }
-      });
-    }
-  }
-}
-
 export class WorkspaceRepository {
   async getPrimaryWorkspace(): Promise<Workspace | null> {
     const workspace = await db.workspace.findFirst({
@@ -395,6 +258,52 @@ export class WorkspaceRepository {
     });
 
     return workspace ? mapWorkspace(workspace) : null;
+  }
+
+  async getWorkspaceForUser(userId: string): Promise<Workspace | null> {
+    const membership = await db.workspaceMember.findFirst({
+      where: {
+        userId,
+        workspace: {
+          accountStatus: "active"
+        }
+      },
+      include: {
+        workspace: true
+      },
+      orderBy: {
+        createdAt: "asc"
+      }
+    });
+
+    return membership?.workspace ? mapWorkspace(membership.workspace) : null;
+  }
+
+  async updateOnboardingTourStep(workspaceId: string, step: number): Promise<Workspace> {
+    const workspace = await db.workspace.update({
+      where: {
+        id: workspaceId
+      },
+      data: {
+        onboardingTourStep: Math.max(0, step)
+      }
+    });
+
+    return mapWorkspace(workspace);
+  }
+
+  async completeOnboardingTour(workspaceId: string): Promise<Workspace> {
+    const workspace = await db.workspace.update({
+      where: {
+        id: workspaceId
+      },
+      data: {
+        onboardingTourCompletedAt: new Date(),
+        onboardingTourStep: 12
+      }
+    });
+
+    return mapWorkspace(workspace);
   }
 
   async upsertGoogleOAuthTokens(input: GoogleWorkspaceAuth): Promise<Workspace> {
@@ -487,6 +396,47 @@ export class WhatsAppConnectionRepository {
     return connection ? mapConnection(connection) : null;
   }
 
+  async findAvailablePoolConnection(): Promise<WhatsAppConnection | null> {
+    const connections = await db.whatsAppConnection.findMany({
+      where: {
+        status: "connected",
+        phoneNumber: {
+          not: null
+        }
+      },
+      orderBy: [
+        {
+          currentTenants: "asc"
+        },
+        {
+          updatedAt: "desc"
+        }
+      ]
+    });
+    const connection = connections.find(
+      (candidate: any) => (candidate.currentTenants ?? 0) < (candidate.maxTenants ?? 3)
+    );
+
+    return connection ? mapConnection(connection) : null;
+  }
+
+  async findAssignedForWorkspace(workspaceId: string): Promise<WhatsAppConnection | null> {
+    const assignment = await db.workspaceConnectionAssignment.findFirst({
+      where: {
+        workspaceId,
+        status: "active"
+      },
+      include: {
+        connection: true
+      },
+      orderBy: {
+        assignedAt: "desc"
+      }
+    });
+
+    return assignment?.connection ? mapConnection(assignment.connection) : null;
+  }
+
   async updateSnapshot(
     connectionId: string,
     updates: Partial<ConnectionSnapshot>
@@ -504,15 +454,32 @@ export class WhatsAppConnectionRepository {
       }
     });
 
-    await db.workspace.update({
-      where: {
-        id: connection.workspaceId
-      },
-      data: {
-        whatsappStatus:
-          connection.status === "connected" ? "CONNECTED" : "DISCONNECTED"
-      }
-    });
+    const whatsappStatus = connection.status === "connected" ? "CONNECTED" : "DISCONNECTED";
+
+    await Promise.all([
+      db.workspace.update({
+        where: {
+          id: connection.workspaceId
+        },
+        data: {
+          whatsappStatus
+        }
+      }),
+      db.workspace.updateMany({
+        where: {
+          connectionAssignments: {
+            some: {
+              connectionId: connection.id,
+              status: "active"
+            }
+          }
+        },
+        data: {
+          whatsappStatus,
+          phoneNumber: connection.phoneNumber
+        }
+      })
+    ]);
 
     return mapConnection(connection);
   }
@@ -942,6 +909,29 @@ export class CampaignRepository {
     };
   }
 
+  async getPrimaryCampaignByWorkspace(workspaceId: string): Promise<Campaign | null> {
+    const campaign = await db.campaign.findFirst({
+      where: {
+        workspaceId
+      },
+      include: {
+        templates: true
+      },
+      orderBy: {
+        createdAt: "asc"
+      }
+    });
+
+    if (!campaign) {
+      return null;
+    }
+
+    return {
+      ...mapCampaign(campaign),
+      templates: await this.getTemplates(campaign.id)
+    };
+  }
+
   async findById(campaignId: string): Promise<Campaign | null> {
     const campaign = await db.campaign.findUnique({
       where: {
@@ -1256,14 +1246,43 @@ export class CampaignRepository {
         createdAt: "desc"
       }
     });
+    const latestOutboundMessage = await db.messageLog.findFirst({
+      where: {
+        campaignId,
+        direction: "OUTBOUND",
+        status: {
+          in: ["queued", "sent"]
+        },
+        body: {
+          not: null
+        }
+      },
+      orderBy: {
+        createdAt: "desc"
+      },
+      select: {
+        body: true,
+        createdAt: true,
+        status: true
+      }
+    });
 
-    return buildDashboardStats(
+    return {
+      ...buildDashboardStats(
       campaign,
       participants,
       campaign.messageCount,
       latestWinnerRaw ? [mapWinnerDraw(latestWinnerRaw)] : [],
       participants.reduce((sum, participant) => sum + participant.referralsCount, 0)
-    );
+      ),
+      latestOutboundMessage: latestOutboundMessage
+        ? {
+            body: latestOutboundMessage.body,
+            createdAt: latestOutboundMessage.createdAt.toISOString(),
+            status: latestOutboundMessage.status
+          }
+        : null
+    };
   }
 
   async getLiveState(campaignId: string): Promise<CampaignLiveState> {

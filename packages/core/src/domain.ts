@@ -73,6 +73,9 @@ export interface Workspace {
   contractSignedAt?: string | null;
   phoneNumber?: string | null;
   whatsappStatus?: "CONNECTED" | "DISCONNECTED";
+  numberPoolStatus?: "waiting" | "assigned";
+  onboardingTourStep?: number;
+  onboardingTourCompletedAt?: string | null;
   createdAt: string;
 }
 
@@ -227,6 +230,11 @@ export interface DashboardStats {
   totalReferralEvents: number;
   leaderboard: LeaderboardEntry[];
   latestWinner: WinnerDraw | null;
+  latestOutboundMessage?: {
+    body: string | null;
+    createdAt: string;
+    status: MessageLogEntry["status"];
+  } | null;
 }
 
 export interface CampaignLiveState {

@@ -1,8 +1,5 @@
 import "dotenv/config";
-import {
-  WhatsAppConnectionRepository,
-  bootstrapDevelopmentData
-} from "@lottery/core";
+import { WhatsAppConnectionRepository } from "@lottery/core";
 import { GoogleContactsSyncService } from "./google/contacts-sync";
 import { SocketGateway } from "./socket/socket-gateway";
 import { CampaignService } from "./services/campaign-service";
@@ -12,10 +9,6 @@ import { SessionOrchestrator } from "./services/session-orchestrator";
 async function main() {
   const baseUrl = process.env.PUBLIC_BASE_URL ?? "http://localhost:3000";
   const socketPort = Number(process.env.SOCKET_IO_PORT ?? 3333);
-
-  if (process.env.ENABLE_DEVELOPMENT_SEED === "true") {
-    await bootstrapDevelopmentData(baseUrl);
-  }
 
   const socketGateway = new SocketGateway();
   await socketGateway.start(socketPort);

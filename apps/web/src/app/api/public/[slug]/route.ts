@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getPublicCampaign } from "../../../../lib/demo-store";
+import { getPublicCampaign } from "../../../../lib/live-store";
 
 export async function GET(
   _request: Request,

@@ -30,7 +30,7 @@ function statusLabel(status: ConnectionStatus): string {
   }
 
   if (status === "qr_ready" || status === "connecting") {
-    return "בתהליך חיבור";
+    return "מתחבר";
   }
 
   if (status === "error") {
@@ -69,12 +69,12 @@ function ChatBubble({
   return (
     <button
       className={cn(
-        "block max-w-[84%] rounded-[22px] px-4 py-3 text-right text-sm leading-6 shadow-sm transition",
+        "block max-w-[84%] whitespace-pre-wrap rounded-[22px] px-4 py-3 text-right text-sm leading-6 shadow-sm transition",
         isUser
           ? "mr-auto rounded-tr-md bg-[#dcf8c6] text-stone-800"
           : "ml-auto rounded-tl-md bg-white text-stone-800",
-        onClick ? "cursor-pointer hover:-translate-y-0.5 hover:ring-2 hover:ring-orange-200" : "",
-        active ? "ring-2 ring-orange-300" : ""
+        onClick ? "cursor-pointer hover:-translate-y-0.5 hover:ring-2 hover:ring-emerald-200" : "",
+        active ? "ring-2 ring-emerald-300" : ""
       )}
       disabled={!onClick}
       onClick={onClick}
@@ -99,26 +99,21 @@ export function OnboardingSimulator({
   templates: CampaignMessageTemplate[];
 }) {
   const enabledTemplates = templates.filter((template) => template.isEnabled);
-  const welcomeTemplate =
-    enabledTemplates.find((template) => template.key === "WELCOME") ??
-    (activeTemplate?.isEnabled ? activeTemplate : null);
+  const joinTemplate = enabledTemplates.find((template) => template.key === "JOIN_WHATSAPP_PROMPT");
+  const welcomeTemplate = enabledTemplates.find((template) => template.key === "WELCOME");
   const saveContactTemplate = enabledTemplates.find(
     (template) => template.key === "SAVE_CONTACT_PROMPT"
   );
-  const successTemplate = enabledTemplates.find((template) => template.key === "LINK");
-  const joinPrefillTemplate = enabledTemplates.find(
-    (template) => template.key === "JOIN_WHATSAPP_PROMPT"
-  );
+  const linkTemplate = enabledTemplates.find((template) => template.key === "LINK");
   const menuTemplate = enabledTemplates.find((template) => template.key === "MAIN_MENU");
 
   return (
-    <Card className="h-fit space-y-5 xl:sticky xl:top-6" dir="rtl">
+    <Card className="h-fit space-y-5 xl:sticky xl:top-6" data-tour="bot-simulator" dir="rtl">
       <div className="flex items-start justify-between gap-4">
         <div className="text-right">
-          <CardTitle>סימולטור לחיץ</CardTitle>
+          <CardTitle>תצוגה מקדימה</CardTitle>
           <CardDescription className="mt-2">
-            לחיצה על בועה פותחת את ההודעה המתאימה לעריכה. זו הדרך הכי מהירה להבין מה
-            הלקוח רואה בפועל.
+            לחיצה על הודעה פותחת אותה לעריכה. כך רואים מהר מה המשתתף יקבל ב-WhatsApp.
           </CardDescription>
         </div>
         <Badge tone={statusTone(connectionStatus)}>{statusLabel(connectionStatus)}</Badge>
@@ -132,54 +127,22 @@ export function OnboardingSimulator({
           </div>
 
           <div className="space-y-3">
-            {joinPrefillTemplate ? (
-              <ChatBubble
-                active={activeTemplate?.key === "JOIN_WHATSAPP_PROMPT"}
-                isUser
-                onClick={() => onSelectTemplate?.("JOIN_WHATSAPP_PROMPT")}
-              >
-                {safeRender(joinPrefillTemplate, previewContext)}
-              </ChatBubble>
-            ) : (
-              <ChatBubble isUser>היי, אשמח להצטרף להגרלה</ChatBubble>
-            )}
-
-            <div className="flex justify-end">
-              <div className="rounded-full bg-white px-3 py-1 text-sm shadow-sm">❤️</div>
-            </div>
-
-            {welcomeTemplate?.mediaUrl ? (
-              <button
-                className="ml-auto block max-w-[84%] rounded-[24px] bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:ring-2 hover:ring-orange-200"
-                onClick={() => onSelectTemplate?.("WELCOME")}
-                type="button"
-              >
-                {welcomeTemplate.mediaType === "VIDEO" ? (
-                  <div className="rounded-[20px] bg-stone-950 px-4 py-10 text-center text-sm text-white">
-                    תצוגת וידאו
-                  </div>
-                ) : (
-                  <img
-                    alt={welcomeTemplate.label}
-                    className="max-h-44 w-full rounded-[20px] object-cover"
-                    src={welcomeTemplate.mediaUrl}
-                  />
-                )}
-              </button>
-            ) : null}
+            <ChatBubble
+              active={activeTemplate?.key === "JOIN_WHATSAPP_PROMPT"}
+              isUser
+              onClick={() => onSelectTemplate?.("JOIN_WHATSAPP_PROMPT")}
+            >
+              {safeRender(joinTemplate, previewContext) || "היי, אשמח להצטרף להגרלה"}
+            </ChatBubble>
 
             <ChatBubble
               active={activeTemplate?.key === "WELCOME"}
               onClick={() => onSelectTemplate?.("WELCOME")}
             >
-              {safeRender(welcomeTemplate, previewContext)}
+              {safeRender(welcomeTemplate, previewContext) || "ברוכים הבאים. איך קוראים לך?"}
             </ChatBubble>
 
             <ChatBubble isUser>{previewContext.name}</ChatBubble>
-
-            <ChatBubble>
-              זיהינו אוטומטית מי הזמין את הלקוח מתוך הקישור, בלי לשאול שאלה מיותרת.
-            </ChatBubble>
 
             {saveContactTemplate ? (
               <ChatBubble
@@ -190,8 +153,8 @@ export function OnboardingSimulator({
                 <div className="mt-3 flex flex-wrap justify-end gap-2">
                   {(saveContactTemplate.interactive?.options ?? []).map((option) => (
                     <span
-                      key={option.id}
                       className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800"
+                      key={option.id}
                     >
                       {option.label}
                     </span>
@@ -202,12 +165,12 @@ export function OnboardingSimulator({
 
             <ChatBubble isUser>שמרתי</ChatBubble>
 
-            {successTemplate ? (
+            {linkTemplate ? (
               <ChatBubble
                 active={activeTemplate?.key === "LINK"}
                 onClick={() => onSelectTemplate?.("LINK")}
               >
-                {safeRender(successTemplate, previewContext)}
+                {safeRender(linkTemplate, previewContext)}
               </ChatBubble>
             ) : null}
 
@@ -216,17 +179,7 @@ export function OnboardingSimulator({
                 active={activeTemplate?.key === "MAIN_MENU"}
                 onClick={() => onSelectTemplate?.("MAIN_MENU")}
               >
-                <div>{safeRender(menuTemplate, previewContext)}</div>
-                <div className="mt-3 space-y-2 rounded-2xl bg-stone-50 p-3">
-                  {(menuTemplate.interactive?.options ?? []).map((option) => (
-                    <div key={option.id} className="rounded-2xl bg-white px-3 py-2">
-                      <p className="font-medium text-stone-900">{option.label}</p>
-                      {option.description ? (
-                        <p className="mt-1 text-xs text-stone-500">{option.description}</p>
-                      ) : null}
-                    </div>
-                  ))}
-                </div>
+                {safeRender(menuTemplate, previewContext)}
               </ChatBubble>
             ) : null}
           </div>

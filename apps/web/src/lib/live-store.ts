@@ -1,11 +1,11 @@
 import net from "node:net";
+import { prisma } from "@lottery/db";
 import {
   CampaignRepository,
   ContactSyncLedgerRepository,
   ParticipantRepository,
   WhatsAppConnectionRepository,
   WorkspaceRepository,
-  bootstrapDevelopmentData,
   type CampaignLiveState,
   type CampaignMessageTemplate,
   type CampaignSettingsUpdate,
@@ -14,8 +14,10 @@ import {
   type DashboardStats,
   type ParticipantStatusSnapshot
 } from "@lottery/core";
+import { auth } from "../auth";
 
 const baseUrl = process.env.PUBLIC_BASE_URL ?? "http://localhost:3000";
+const db = prisma as any;
 
 const workspaceRepository = new WorkspaceRepository();
 const connectionRepository = new WhatsAppConnectionRepository();
@@ -76,17 +78,146 @@ async function isWorkerOnline(): Promise<boolean> {
 }
 
 async function ensureDatabase(): Promise<void> {
-  if (process.env.ENABLE_DEVELOPMENT_SEED === "true") {
-    await bootstrapDevelopmentData(baseUrl);
-  }
+  return;
 }
 
-export async function getPrimaryStore() {
+function isSuperAdmin(session: any): boolean {
+  return session?.user?.globalRole === "SUPER_ADMIN";
+}
+
+function sessionUserId(session: any): string | null {
+  return session?.user?.id ? String(session.user.id) : null;
+}
+
+async function assertCampaignAccess(campaignId: string, write = false) {
+  const session = await auth();
+  const userId = sessionUserId(session);
+
+  if (!userId) {
+    throw new Error("Unauthorized.");
+  }
+
+  const campaign = await db.campaign.findUnique({
+    where: {
+      id: campaignId
+    },
+    select: {
+      id: true,
+      workspaceId: true
+    }
+  });
+
+  if (!campaign) {
+    throw new Error("Campaign not found.");
+  }
+
+  if (isSuperAdmin(session)) {
+    return campaign;
+  }
+
+  const allowedRoles = write ? ["OWNER", "ADMIN", "EDITOR"] : ["OWNER", "ADMIN", "EDITOR", "VIEWER"];
+  const membership = await db.workspaceMember.findFirst({
+    where: {
+      userId,
+      workspaceId: campaign.workspaceId,
+      role: {
+        in: allowedRoles
+      }
+    }
+  });
+
+  if (!membership) {
+    throw new Error("Forbidden.");
+  }
+
+  return campaign;
+}
+
+async function assertConnectionAccess(connectionId: string, adminOnly = false): Promise<boolean> {
+  const session = await auth();
+  const userId = sessionUserId(session);
+
+  if (!userId) {
+    throw new Error("Unauthorized.");
+  }
+
+  if (isSuperAdmin(session)) {
+    return true;
+  }
+
+  if (adminOnly) {
+    throw new Error("Forbidden.");
+  }
+
+  const membership = await db.workspaceMember.findFirst({
+    where: {
+      userId,
+      workspace: {
+        OR: [
+          {
+            connections: {
+              some: {
+                id: connectionId
+              }
+            }
+          },
+          {
+            connectionAssignments: {
+              some: {
+                connectionId,
+                status: "active"
+              }
+            }
+          }
+        ]
+      }
+    }
+  });
+
+  if (!membership) {
+    throw new Error("Forbidden.");
+  }
+
+  return false;
+}
+
+function snapshotFromConnection(
+  connection: NonNullable<Awaited<ReturnType<WhatsAppConnectionRepository["findById"]>>>,
+  workerOnline: boolean,
+  includeSensitive: boolean
+): ConnectionSnapshot {
+  return {
+    connectionId: connection.id,
+    status: connection.status,
+    provider: connection.provider,
+    batteryLevel: workerOnline ? connection.batteryLevel : null,
+    qrCode: includeSensitive && workerOnline ? connection.qrCode : null,
+    phoneNumber: connection.phoneNumber,
+    sessionKey: includeSensitive ? connection.sessionKey : "",
+    lastError: includeSensitive ? connection.lastError : null,
+    updatedAt: connection.updatedAt,
+    workerOnline
+  };
+}
+
+export async function getStoreForUser(userId: string) {
   await ensureDatabase();
 
-  const workspace = await workspaceRepository.getPrimaryWorkspace();
-  const connection = await connectionRepository.getPrimaryConnection();
-  const campaign = await campaignRepository.getPrimaryCampaign();
+  const workspace = await workspaceRepository.getWorkspaceForUser(userId);
+
+  if (!workspace) {
+    return null;
+  }
+
+  const campaign = await campaignRepository.getPrimaryCampaignByWorkspace(workspace.id);
+
+  if (!campaign) {
+    return null;
+  }
+
+  const connection =
+    (await connectionRepository.findAssignedForWorkspace(workspace.id)) ??
+    (await connectionRepository.findById(campaign.connectionId));
 
   if (!workspace || !connection || !campaign) {
     return null;
@@ -102,7 +233,45 @@ export async function getPrimaryStore() {
   };
 }
 
-export async function getDemoStore() {
+export async function getPrimaryStore() {
+  const session = await auth();
+  const userId = sessionUserId(session);
+
+  if (!userId) {
+    return null;
+  }
+
+  const userStore = await getStoreForUser(userId);
+
+  if (userStore) {
+    return userStore;
+  }
+
+  if (!isSuperAdmin(session)) {
+    return null;
+  }
+
+  await ensureDatabase();
+
+  const workspace = await workspaceRepository.getPrimaryWorkspace();
+  const campaign = await campaignRepository.getPrimaryCampaign();
+  const connection = campaign ? await connectionRepository.findById(campaign.connectionId) : null;
+
+  if (!workspace || !connection || !campaign) {
+    return null;
+  }
+
+  const participants = await participantRepository.listByCampaign(campaign.id);
+
+  return {
+    workspace,
+    connection,
+    campaign,
+    participants
+  };
+}
+
+export async function getRequiredStore() {
   const store = await getPrimaryStore();
 
   if (!store) {
@@ -112,7 +281,10 @@ export async function getDemoStore() {
   return store;
 }
 
-export async function getConnectionSnapshot(connectionId: string): Promise<ConnectionSnapshot> {
+export async function getConnectionSnapshot(
+  connectionId: string,
+  options: { includeSensitive?: boolean } = {}
+): Promise<ConnectionSnapshot> {
   await ensureDatabase();
   const connection = await connectionRepository.findById(connectionId);
   const workerOnline = await isWorkerOnline();
@@ -121,24 +293,55 @@ export async function getConnectionSnapshot(connectionId: string): Promise<Conne
     throw new Error("Connection not found.");
   }
 
-  return {
-    connectionId: connection.id,
-    status: connection.status,
-    provider: connection.provider,
-    batteryLevel: workerOnline ? connection.batteryLevel : null,
-    qrCode: workerOnline ? connection.qrCode : null,
-    phoneNumber: connection.phoneNumber,
-    sessionKey: connection.sessionKey,
-    lastError: connection.lastError,
-    updatedAt: connection.updatedAt,
-    workerOnline
-  };
+  return snapshotFromConnection(connection, workerOnline, Boolean(options.includeSensitive));
+}
+
+export async function getConnectionSnapshotForCurrentUser(
+  connectionId: string
+): Promise<ConnectionSnapshot> {
+  const includeSensitive = await assertConnectionAccess(connectionId);
+
+  if (includeSensitive) {
+    const session = await auth();
+
+    await db.adminAuditLog.create({
+      data: {
+        actorUserId: sessionUserId(session),
+        action: "ADMIN_CONNECTION_STATUS_ACCESS",
+        targetType: "WhatsAppConnection",
+        targetId: connectionId,
+        metadata: {
+          accessedAt: new Date().toISOString()
+        }
+      }
+    });
+  }
+
+  return getConnectionSnapshot(connectionId, { includeSensitive });
+}
+
+export async function assertAdminConnectionAccess(connectionId: string): Promise<void> {
+  await assertConnectionAccess(connectionId, true);
+  const session = await auth();
+
+  await db.adminAuditLog.create({
+    data: {
+      actorUserId: sessionUserId(session),
+      action: "ADMIN_CONNECTION_TOOL_ACCESS",
+      targetType: "WhatsAppConnection",
+      targetId: connectionId,
+      metadata: {
+        accessedAt: new Date().toISOString()
+      }
+    }
+  });
 }
 
 export async function launchOrReconnectConnection(
   connectionId: string
 ): Promise<ConnectionSnapshot> {
   await ensureDatabase();
+  await assertAdminConnectionAccess(connectionId);
   const connection = await connectionRepository.markConnected(connectionId);
 
   return {
@@ -156,6 +359,7 @@ export async function launchOrReconnectConnection(
 
 export async function resetConnectionToQr(connectionId: string): Promise<ConnectionSnapshot> {
   await ensureDatabase();
+  await assertAdminConnectionAccess(connectionId);
   const connection = await connectionRepository.regenerateQr(connectionId);
 
   return {
@@ -173,6 +377,7 @@ export async function resetConnectionToQr(connectionId: string): Promise<Connect
 
 export async function getTemplates(campaignId: string): Promise<CampaignMessageTemplate[]> {
   await ensureDatabase();
+  await assertCampaignAccess(campaignId);
   return campaignRepository.getTemplates(campaignId);
 }
 
@@ -181,6 +386,7 @@ export async function updateTemplates(
   updates: CampaignTemplateUpdateInput[]
 ): Promise<CampaignMessageTemplate[]> {
   await ensureDatabase();
+  await assertCampaignAccess(campaignId, true);
   return campaignRepository.updateTemplates(campaignId, updates);
 }
 
@@ -189,21 +395,25 @@ export async function updateCampaignSettings(
   updates: CampaignSettingsUpdate
 ) {
   await ensureDatabase();
+  await assertCampaignAccess(campaignId, true);
   return campaignRepository.updateSettings(campaignId, updates);
 }
 
 export async function getDashboardStats(campaignId: string): Promise<DashboardStats> {
   await ensureDatabase();
+  await assertCampaignAccess(campaignId);
   return campaignRepository.getDashboardStats(campaignId);
 }
 
 export async function getCampaignLiveState(campaignId: string): Promise<CampaignLiveState> {
   await ensureDatabase();
+  await assertCampaignAccess(campaignId);
   return campaignRepository.getLiveState(campaignId);
 }
 
 export async function runWinnerDraw(campaignId: string) {
   await ensureDatabase();
+  await assertCampaignAccess(campaignId, true);
   const winner = await campaignRepository.drawWeightedWinner(campaignId);
 
   return {
@@ -223,15 +433,34 @@ export async function getPublicCampaign(slug: string) {
     throw new Error("Campaign not found.");
   }
 
-  const [connection, workspace] = await Promise.all([
+  const [connection, workspace, assignment] = await Promise.all([
     connectionRepository.findById(campaign.connectionId),
-    workspaceRepository.getPrimaryWorkspace()
+    db.workspace.findUnique({
+      where: {
+        id: campaign.workspaceId
+      },
+      select: {
+        phoneNumber: true
+      }
+    }),
+    db.workspaceConnectionAssignment.findFirst({
+      where: {
+        workspaceId: campaign.workspaceId,
+        status: "active"
+      },
+      include: {
+        connection: true
+      },
+      orderBy: {
+        assignedAt: "desc"
+      }
+    })
   ]);
   const leaderboard = await participantRepository.getLeaderboard(campaign.id);
 
   return {
     campaign,
-    whatsappPhone: connection?.phoneNumber ?? workspace?.phoneNumber ?? null,
+    whatsappPhone: assignment?.connection?.phoneNumber ?? connection?.phoneNumber ?? workspace?.phoneNumber ?? null,
     totalParticipants: leaderboard.length,
     leaderboard: leaderboard.slice(0, 10)
   };
@@ -247,7 +476,12 @@ export async function getParticipantStatusByPhone(
 
 export async function getContactsOverview() {
   await ensureDatabase();
-  const store = await getDemoStore();
+  const store = await getPrimaryStore();
+
+  if (!store) {
+    throw new Error("Unable to load workspace, campaign, or connection from the database.");
+  }
+
   const entries = await contactSyncLedgerRepository.listByWorkspace(store.workspace.id);
 
   return {

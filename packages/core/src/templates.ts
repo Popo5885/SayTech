@@ -12,41 +12,41 @@ const VARIABLE_PATTERN = /\{\{\s*([a-z_]+)\s*\}\}/g;
 
 const labelByKey: Record<MessageTemplateKey, string> = {
   WELCOME: "הודעת פתיחה ובקשת שם",
-  REFERRER_PROMPT: "שאלת מי הזמין אותך",
-  SAVE_CONTACT_PROMPT: "בדיקת שמירת איש קשר",
+  REFERRER_PROMPT: "שאלת מפנה ידנית",
+  SAVE_CONTACT_PROMPT: "בקשת שמירת איש קשר",
   REGISTRATION_PAUSED: "הודעת עצירה",
-  MAIN_MENU: "תפריט לקוח חוזר",
-  LINK: "קישור אישי",
+  MAIN_MENU: "תפריט למשתתף חוזר",
+  LINK: "שליחת קישור אישי",
   JOIN_WHATSAPP_PROMPT: "טקסט פתיחת WhatsApp מהקישור",
-  STATUS_TICKETS: "סטטוס וכרטיסים",
-  WINNER: "הודעת זוכה",
-  SELF_STATUS: "סטטוס מלא",
+  STATUS_TICKETS: "בדיקת כרטיסים",
+  WINNER: "הודעת זכייה",
+  SELF_STATUS: "סטטוס אישי מלא",
   REFERRAL_UPDATE: "עדכון למפנה",
   LEADERBOARD_SUMMARY: "סיכום מובילים"
 };
 
 const defaultByKey: Record<MessageTemplateKey, string> = {
   WELCOME:
-    "ברוכים הבאים להגרלה שלנו 🎉\nכדי שנרשום אותך כמו שצריך, איך קוראים לך?",
+    "שלום {{name}}, ברוכים הבאים ל{{campaign_name}}.\nכדי להשלים הרשמה, נבקש לשמור את איש הקשר שלנו ואז תקבלו קישור אישי לשיתוף.",
   REFERRER_PROMPT:
-    "מעולה {{name}} 💛\nמי הזמין אותך להגרלה? אפשר לשלוח שם או מספר טלפון. אם אף אחד לא הזמין, כתבי \"אין\".",
+    "מי הזמין אותך להגרלה?\nאפשר לשלוח שם או מספר טלפון. אם אף אחד לא הזמין אותך, כתבו: אין.",
   SAVE_CONTACT_PROMPT:
-    "יש רק שלב אחד קטן כדי שההשתתפות שלך תאושר:\nחובה לשמור את המספר שלנו באנשי הקשר שלך 📱\n\nלמה זה חשוב?\nכי ההגרלה וההכרזה על הזוכים יעלו אצלנו בסטטוס. בלי לשמור אותנו לא תוכלי לראות עדכונים אם זכית.",
+    "כדי לקבל עדכונים על ההגרלה, חשוב לשמור אותנו באנשי הקשר.\nאחרי ששמרת, לחצו על הכפתור: שמרתי.",
   REGISTRATION_PAUSED:
-    "אין בעיה. כרגע עצרנו את הרישום שלך.\nכשתשמרי את המספר שלנו, שלחי \"שמרתי\" ונמשיך בדיוק מאותה נקודה.",
-  MAIN_MENU: "בחרי מה תרצי לקבל עכשיו:",
+    "אין בעיה. נעצור כאן.\nאחרי שתשמרו את איש הקשר, כתבו לנו שמרתי ונמשיך בדיוק מאותה נקודה.",
+  MAIN_MENU: "מה תרצו לעשות עכשיו?",
   LINK:
-    "איזה כיף {{name}}! נרשמת בהצלחה 🎟️\nזה הקישור האישי שלך לשיתוף:\n{{link}}\n\nכל משתתף שמצטרף דרכך מגדיל את הסיכוי שלך.",
+    "מעולה {{name}}, ההרשמה הושלמה.\nזה הקישור האישי שלך לשיתוף:\n{{link}}\n\nכל מי שמצטרף דרך הקישור שלך מוסיף לך כרטיסים.",
   JOIN_WHATSAPP_PROMPT:
-    "היי, הגעתי דרך הקישור להצטרפות ל{{campaign_name}}. קוד ההפניה שלי הוא {{ref}}.",
+    "היי, אשמח להצטרף ל{{campaign_name}}. הגעתי דרך {{ref}}.",
   STATUS_TICKETS:
-    "היי {{name}}, יש לך כרגע {{tickets}} כרטיסים ו-{{referrals}} הפניות מאושרות.\nהמיקום שלך כרגע: #{{rank}}.",
+    "שלום {{name}}, יש לך כרגע {{tickets}} כרטיסים ו-{{referrals}} הפניות מאושרות.\nהמיקום שלך: #{{rank}}.",
   WINNER:
-    "ברכות {{name}}! זכית בהגרלה 🎉\nניצור איתך קשר במספר {{contact_phone}}.",
+    "ברכות {{name}}, זכית ב{{campaign_name}}.\nניצור איתך קשר במספר {{contact_phone}}.",
   SELF_STATUS:
-    "היי {{name}}, יש לך {{tickets}} כרטיסים ו-{{referrals}} הפניות.\nהמיקום שלך: #{{rank}}\n\nהקישור האישי שלך:\n{{link}}\n\nהמובילים כרגע:\n{{top10}}",
+    "שלום {{name}}, יש לך {{tickets}} כרטיסים ו-{{referrals}} הפניות.\nהמיקום שלך: #{{rank}}\n\nהקישור האישי שלך:\n{{link}}\n\nהמובילים כרגע:\n{{top10}}",
   REFERRAL_UPDATE:
-    "חדשות טובות {{name}} 🎉\nהצטרף משתתף דרך הקישור שלך. עכשיו יש לך {{referrals}} הפניות ו-{{tickets}} כרטיסים.",
+    "עדכון טוב, {{name}}.\nמשתתף חדש הצטרף דרך הקישור שלך. עכשיו יש לך {{referrals}} הפניות ו-{{tickets}} כרטיסים.",
   LEADERBOARD_SUMMARY:
     "המובילים כרגע:\n{{top10}}"
 };
@@ -56,29 +56,29 @@ const interactiveDefaults: Partial<Record<MessageTemplateKey, TemplateInteractiv
     kind: "BUTTONS",
     options: [
       { id: "saved_contact_yes", label: "שמרתי" },
-      { id: "saved_contact_no", label: "לא שמרתי" }
+      { id: "saved_contact_no", label: "עדיין לא שמרתי" }
     ]
   },
   MAIN_MENU: {
     kind: "LIST",
-    buttonText: "פתחי תפריט",
-    title: "מה תרצי לעשות?",
-    footer: "אפשר לבחור בכל רגע מחדש",
+    buttonText: "פתח תפריט",
+    title: "פעולות זמינות",
+    footer: "אפשר לבחור פעולה בכל רגע",
     options: [
       {
         id: "menu_status",
         label: "כמה כרטיסים יש לי",
-        description: "בדיקת מצב אישי וכמות כרטיסים"
+        description: "בדיקת מצב אישי"
       },
       {
         id: "menu_link",
-        label: "לינק אישי",
-        description: "שליחת קישור ההפניה שלך"
+        label: "הקישור שלי",
+        description: "קבלת קישור ההפניה"
       },
       {
         id: "menu_winner",
         label: "רשימת זוכים",
-        description: "עדכון על הגרלה וזוכים"
+        description: "צפייה בזוכים שפורסמו"
       }
     ]
   }
@@ -107,29 +107,29 @@ export function getTemplateLabel(key: MessageTemplateKey): string {
 export function getTemplateDescription(key: MessageTemplateKey): string {
   switch (key) {
     case "WELCOME":
-      return "הודעת הכניסה הראשונה, כולל טקסט פתיחה ושאלה לשם.";
+      return "ההודעה הראשונה שהמשתתף מקבל אחרי שהבוט מזהה אותו.";
     case "REFERRER_PROMPT":
-      return "השאלה שנשלחת אחרי קבלת השם כדי לזהות מי הזמין את הלקוח.";
+      return "שאלה ידנית למקרה שאין קוד מפנה בקישור.";
     case "SAVE_CONTACT_PROMPT":
-      return "הודעת האישור ששואלת אם נשמר איש הקשר, עם כפתורים.";
+      return "בקשה פשוטה לשמור את איש הקשר כדי לראות עדכונים ב-WhatsApp.";
     case "REGISTRATION_PAUSED":
-      return "הודעה שנשלחת אם הלקוח עדיין לא שמר את המספר.";
+      return "הודעה שנשלחת אם המשתתף עדיין לא שמר את איש הקשר.";
     case "MAIN_MENU":
-      return "תפריט הפעולות של משתמשים חוזרים.";
+      return "תפריט קצר למשתתפים שחוזרים לבוט.";
     case "LINK":
-      return "הודעת הצלחה עם הקישור האישי לשיתוף.";
+      return "הודעת הסיום עם הקישור האישי לשיתוף.";
     case "JOIN_WHATSAPP_PROMPT":
-      return "הטקסט שנפתח ב-WhatsApp אחרי לחיצה על קישור ההצטרפות. קוד ההפניה יישמר אוטומטית כדי שנזהה מי הזמין.";
+      return "הטקסט שנפתח אוטומטית ב-WhatsApp מתוך קישור ההצטרפות.";
     case "STATUS_TICKETS":
-      return "סטטוס אישי: כרטיסים, הפניות ומיקום.";
+      return "תשובה קצרה על מספר כרטיסים והפניות.";
     case "WINNER":
-      return "הודעת זכייה סופית.";
+      return "הודעה לזוכה אחרי הגרלה אמיתית.";
     case "REFERRAL_UPDATE":
-      return "עדכון למפנה כשמשתתף חדש הצטרף דרכו.";
+      return "עדכון למשתתף כשמישהו חדש הצטרף דרכו.";
     case "SELF_STATUS":
-      return "גרסה מלאה של הסטטוס האישי.";
+      return "סטטוס אישי מלא כולל הקישור האישי.";
     case "LEADERBOARD_SUMMARY":
-      return "סיכום כללי של המובילים.";
+      return "סיכום קצר של המובילים.";
     default:
       return "";
   }
@@ -211,14 +211,14 @@ export function buildTemplatePreviewContext(
   overrides: Partial<TemplatePreviewContext> = {}
 ): TemplatePreviewContext {
   return {
-    name: "יעל",
-    tickets: 8,
-    link: "https://example.com/join/spring-2026?ref=AB12CD34",
-    referrals: 5,
-    rank: 3,
-    top10: "1. ש***ה - 12 הפניות\n2. נ***ה - 9 הפניות\n3. י***ל - 5 הפניות",
+    name: "שם המשתתף",
+    tickets: 0,
+    link: "https://example.com/join/campaign?ref=AB12CD34",
+    referrals: 0,
+    rank: 0,
+    top10: "עדיין אין משתתפים",
     contact_phone: "+972501234567",
-    campaign_name: "הגרלת האביב",
+    campaign_name: "שם ההגרלה שלך",
     ref: "AB12CD34",
     ...overrides
   };

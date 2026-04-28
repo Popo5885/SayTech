@@ -1,6 +1,6 @@
 import { ContactsSyncCard } from "../../../components/contacts-sync-card";
 import { EmptyWorkspaceState } from "../../../components/empty-workspace-state";
-import { getContactsOverview, getPrimaryStore } from "../../../lib/demo-store";
+import { getContactsOverview, getPrimaryStore } from "../../../lib/live-store";
 
 export default async function DashboardContactsPage() {
   const store = await getPrimaryStore();

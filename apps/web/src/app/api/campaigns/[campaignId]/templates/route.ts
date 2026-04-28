@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { CampaignTemplateUpdateInput } from "@lottery/core";
-import { getTemplates, updateTemplates } from "../../../../../lib/demo-store";
+import { getTemplates, updateTemplates } from "../../../../../lib/live-store";
 
 export async function GET(
   _request: Request,

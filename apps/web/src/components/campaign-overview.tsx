@@ -7,23 +7,23 @@ export function CampaignOverview({ campaign }: { campaign: Campaign }) {
     <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
       <Card className="space-y-6">
         <div className="flex items-center gap-3">
-          <CardTitle>Campaign Modes</CardTitle>
-          <Badge tone="success">Referral + Trigger Join</Badge>
+          <CardTitle>איך אנשים מצטרפים?</CardTitle>
+          <Badge tone="success">קישור אישי + מילת פתיחה</Badge>
         </div>
         <div className="grid gap-4 md:grid-cols-2">
           <div className="rounded-[28px] border border-stone-200 bg-stone-50 p-5">
-            <p className="text-xs uppercase tracking-[0.22em] text-stone-500">Mode A</p>
-            <h3 className="mt-3 text-lg font-semibold text-stone-900">Bring a Friend</h3>
+            <p className="text-xs font-bold text-stone-500">אפשרות 1</p>
+            <h3 className="mt-3 text-lg font-semibold text-stone-900">מביאים חברים</h3>
             <p className="mt-3 text-sm leading-6 text-stone-600">
-              Each participant gets a unique link and can ask the bot for their own stats, tickets,
-              and current top-10 summary directly from WhatsApp.
+              כל משתתף מקבל קישור אישי. כשהוא משתף אותו, המערכת יודעת מי הביא את מי
+              ומעדכנת את הכרטיסים באופן אוטומטי.
             </p>
           </div>
           <div className="rounded-[28px] border border-stone-200 bg-stone-50 p-5">
-            <p className="text-xs uppercase tracking-[0.22em] text-stone-500">Mode B</p>
-            <h3 className="mt-3 text-lg font-semibold text-stone-900">Simple Join</h3>
+            <p className="text-xs font-bold text-stone-500">אפשרות 2</p>
+            <h3 className="mt-3 text-lg font-semibold text-stone-900">הצטרפות פשוטה</h3>
             <p className="mt-3 text-sm leading-6 text-stone-600">
-              Anyone who sends the trigger word joins instantly. The current default trigger is{" "}
+              מי ששולח את מילת הפתיחה מצטרף לתהליך. מילת הפתיחה הנוכחית היא{" "}
               <span className="font-semibold">{campaign.triggerWord}</span>.
             </p>
           </div>
@@ -31,9 +31,9 @@ export function CampaignOverview({ campaign }: { campaign: Campaign }) {
       </Card>
 
       <Card className="space-y-5">
-        <CardTitle>Participant Self-Service</CardTitle>
+        <CardTitle>פקודות שהמשתתף יכול לשלוח</CardTitle>
         <CardDescription>
-          Supported status commands are configurable per campaign. Right now the active aliases are:
+          אלה המילים שהמשתתף יכול לשלוח ב-WhatsApp כדי לבדוק כמה כרטיסים יש לו.
         </CardDescription>
         <div className="flex flex-wrap gap-2">
           {campaign.statusCommandAliases.map((command) => (
@@ -44,7 +44,7 @@ export function CampaignOverview({ campaign }: { campaign: Campaign }) {
         </div>
         <div className="rounded-[28px] border border-orange-200 bg-orange-50/70 p-5">
           <p className="text-sm leading-6 text-stone-700">
-            Public landing page:{" "}
+            עמוד ההצטרפות של ההגרלה:{" "}
             <Link className="font-semibold text-orange-700" href={`/join/${campaign.slug}`}>
               /join/{campaign.slug}
             </Link>
@@ -54,7 +54,7 @@ export function CampaignOverview({ campaign }: { campaign: Campaign }) {
           className="inline-flex h-11 items-center justify-center rounded-2xl bg-[var(--accent)] px-4 text-sm font-semibold text-white transition hover:bg-[var(--accent-strong)]"
           href={`/join/${campaign.slug}`}
         >
-          Open Public Campaign Page
+          פתיחת עמוד ההצטרפות
         </Link>
       </Card>
     </div>

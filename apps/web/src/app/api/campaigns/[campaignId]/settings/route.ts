@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { CampaignSettingsUpdate } from "@lottery/core";
-import { updateCampaignSettings } from "../../../../../lib/demo-store";
+import { updateCampaignSettings } from "../../../../../lib/live-store";
 
 export async function PATCH(
   request: Request,

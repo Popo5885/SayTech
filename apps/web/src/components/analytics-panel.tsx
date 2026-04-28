@@ -103,10 +103,10 @@ export function AnalyticsPanel({
             <div className="text-right">
               <CardTitle>טבלת מובילים בזמן אמת</CardTitle>
               <CardDescription className="mt-2">
-                דירוג Top 10 אנונימי לפי כרטיסים והפניות שנשמרו באמת במסד הנתונים.
+                עשרת המשתתפים המובילים לפי כרטיסים והפניות שנשמרו במערכת.
               </CardDescription>
             </div>
-            <Badge tone="warning">Top 10</Badge>
+            <Badge tone="warning">עשרת המובילים</Badge>
           </div>
 
           <div className="space-y-3">

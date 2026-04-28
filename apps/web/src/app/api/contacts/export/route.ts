@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getPrimaryStore } from "../../../../lib/demo-store";
+import { getPrimaryStore } from "../../../../lib/live-store";
 
 function formatPhoneForContact(phone: string): string {
   const digits = phone.replace(/[^\d+]/g, "");

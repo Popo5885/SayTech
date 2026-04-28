@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Sans_Hebrew, Space_Grotesk } from "next/font/google";
+import { AccessibilityWidget } from "../components/accessibility-widget";
+import "driver.js/dist/driver.css";
 import "./globals.css";
 
 const headingFont = Space_Grotesk({
@@ -14,8 +16,8 @@ const bodyFont = IBM_Plex_Sans_Hebrew({
 });
 
 export const metadata: Metadata = {
-  title: "WhatsApp Lottery SaaS",
-  description: "Manage WhatsApp lottery and referral campaigns from one clean dashboard."
+  title: "Magic Flow | ניהול הגרלות WhatsApp",
+  description: "מערכת עברית פשוטה לניהול הגרלות WhatsApp, לידים, אנשי קשר והפניות."
 };
 
 export default function RootLayout({
@@ -24,8 +26,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html className={`${headingFont.variable} ${bodyFont.variable}`} lang="he">
-      <body className="font-[var(--font-body)] antialiased">{children}</body>
+    <html className={`${headingFont.variable} ${bodyFont.variable}`} dir="rtl" lang="he">
+      <body className="font-[var(--font-body)] antialiased">
+        {children}
+        <AccessibilityWidget />
+      </body>
     </html>
   );
 }

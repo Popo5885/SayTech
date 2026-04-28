@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCampaignLiveState } from "../../../../../lib/demo-store";
+import { getCampaignLiveState } from "../../../../../lib/live-store";
 
 export async function GET(
   _request: Request,

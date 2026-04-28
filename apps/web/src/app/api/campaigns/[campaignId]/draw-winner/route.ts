@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { runWinnerDraw } from "../../../../../lib/demo-store";
+import { runWinnerDraw } from "../../../../../lib/live-store";
 
 export async function POST(
   _request: Request,
