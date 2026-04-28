@@ -1,4 +1,5 @@
 import net from "node:net";
+import { cookies } from "next/headers";
 import { prisma } from "@lottery/db";
 import {
   CampaignRepository,
@@ -236,12 +237,56 @@ export async function getStoreForUser(userId: string) {
   };
 }
 
+async function getStoreForWorkspace(workspaceId: string) {
+  await ensureDatabase();
+
+  const workspace = await workspaceRepository.findById(workspaceId);
+
+  if (!workspace) {
+    return null;
+  }
+
+  const campaign = await campaignRepository.getPrimaryCampaignByWorkspace(workspace.id);
+
+  if (!campaign) {
+    return null;
+  }
+
+  const connection =
+    (await connectionRepository.findAssignedForWorkspace(workspace.id)) ??
+    (await connectionRepository.findById(campaign.connectionId));
+
+  if (!connection) {
+    return null;
+  }
+
+  const participants = await participantRepository.listByCampaign(campaign.id);
+
+  return {
+    workspace,
+    connection,
+    campaign,
+    participants
+  };
+}
+
 export async function getPrimaryStore() {
   const session = await auth();
   const userId = sessionUserId(session);
 
   if (!userId) {
     return null;
+  }
+
+  if (isSuperAdmin(session)) {
+    const adminWorkspaceId = (await cookies()).get("admin_workspace_id")?.value;
+    const adminWorkspaceStore = adminWorkspaceId
+      ? await getStoreForWorkspace(adminWorkspaceId)
+      : null;
+
+    if (adminWorkspaceStore) {
+      return adminWorkspaceStore;
+    }
   }
 
   const userStore = await getStoreForUser(userId);

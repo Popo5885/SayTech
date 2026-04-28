@@ -250,6 +250,16 @@ export interface GoogleSyncAccount {
 }
 
 export class WorkspaceRepository {
+  async findById(workspaceId: string): Promise<Workspace | null> {
+    const workspace = await db.workspace.findUnique({
+      where: {
+        id: workspaceId
+      }
+    });
+
+    return workspace ? mapWorkspace(workspace) : null;
+  }
+
   async getPrimaryWorkspace(): Promise<Workspace | null> {
     const workspace = await db.workspace.findFirst({
       orderBy: {

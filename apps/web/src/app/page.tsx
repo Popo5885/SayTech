@@ -12,8 +12,31 @@ import {
   Wand2,
   Zap
 } from "lucide-react";
+import { prisma } from "@lottery/db";
 
 const phone = "054-246-6340";
+const db = prisma as any;
+
+async function getLandingContent() {
+  try {
+    const settings = await db.siteSetting.findMany({
+      where: {
+        key: {
+          in: ["landing_title", "landing_subtitle", "landing_price"]
+        }
+      }
+    });
+    const map = new Map(settings.map((setting: any) => [setting.key, setting.value]));
+
+    return {
+      title: map.get("landing_title") as string | undefined,
+      subtitle: map.get("landing_subtitle") as string | undefined,
+      price: map.get("landing_price") as string | undefined
+    };
+  } catch {
+    return {};
+  }
+}
 
 const heroHighlights = [
   {
@@ -69,7 +92,14 @@ const steps = [
   "מבצעים הגרלה שקופה בלחיצה"
 ];
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  const landingContent = await getLandingContent();
+  const landingTitle = landingContent.title || "הגרלה ויראלית ב-WhatsApp, בלי כאב ראש.";
+  const landingSubtitle =
+    landingContent.subtitle ||
+    "Magic Flow עוזרת לבעלי עסקים ליצור הגרלה, לאסוף משתתפים, לזהות מפנים, לשמור אנשי קשר ולבצע הגרלה שקופה. הכל בעברית, פשוט ונקי.";
+  const landingPrice = landingContent.price || "1,000 ₪";
+
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#070914] text-white" dir="rtl">
       <div className="pointer-events-none absolute inset-0">
@@ -112,14 +142,12 @@ export default function LandingPage() {
 
           <div className="space-y-5">
             <h1 className="max-w-4xl text-5xl font-black leading-[1.02] tracking-tight md:text-7xl">
-              הגרלה ויראלית ב-WhatsApp,
-              <span className="block bg-gradient-to-l from-cyan-200 via-emerald-200 to-violet-300 bg-clip-text text-transparent">
-                בלי כאב ראש.
+              <span className="bg-gradient-to-l from-cyan-200 via-emerald-200 to-violet-300 bg-clip-text text-transparent">
+                {landingTitle}
               </span>
             </h1>
             <p className="max-w-2xl text-lg leading-8 text-slate-300 md:text-xl">
-              Magic Flow עוזרת לבעלי עסקים ליצור הגרלה, לאסוף משתתפים, לזהות מפנים,
-              לשמור אנשי קשר ולבצע הגרלה שקופה. הכל בעברית, פשוט ונקי.
+              {landingSubtitle}
             </p>
           </div>
 
@@ -225,7 +253,7 @@ export default function LandingPage() {
           <p className="mx-auto mt-4 max-w-2xl text-lg leading-8 text-slate-300">
             כולל עמוד בית, דשבורד, עורך הודעות, חיבורי WhatsApp, אנשי קשר, הדרכות וניהול בסיסי.
           </p>
-          <div className="my-8 text-6xl font-black">1,000 ₪</div>
+          <div className="my-8 text-6xl font-black">{landingPrice}</div>
           <Link className="inline-flex h-14 items-center gap-2 rounded-2xl bg-white px-7 font-black text-slate-950 transition hover:-translate-y-0.5" href="/contact">
             דברו עם הצוות
             <MousePointer2 className="h-5 w-5" />

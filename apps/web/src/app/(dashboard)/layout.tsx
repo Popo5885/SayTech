@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { auth } from "../../auth";
 import { DashboardShell } from "../../components/dashboard-shell";
 
@@ -25,6 +26,11 @@ export default async function DashboardLayout({
   const adminEmail = (process.env.SUPERADMIN_EMAIL ?? "aknvpupuch@gmail.com").toLowerCase();
   const isSuperAdmin =
     user.globalRole === "SUPER_ADMIN" || user.email?.toLowerCase() === adminEmail;
+  const adminWorkspaceId = (await cookies()).get("admin_workspace_id")?.value;
 
-  return <DashboardShell isSuperAdmin={isSuperAdmin}>{children}</DashboardShell>;
+  if (isSuperAdmin && !adminWorkspaceId) {
+    redirect("/admin");
+  }
+
+  return <DashboardShell>{children}</DashboardShell>;
 }

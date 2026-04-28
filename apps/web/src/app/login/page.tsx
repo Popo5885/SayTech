@@ -10,12 +10,13 @@ async function loginAction(formData: FormData) {
 
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
+  const adminEmail = (process.env.SUPERADMIN_EMAIL ?? "aknvpupuch@gmail.com").toLowerCase();
 
   try {
     await signIn("credentials", {
       email,
       password,
-      redirectTo: "/dashboard"
+      redirectTo: email === adminEmail ? "/admin" : "/dashboard"
     });
   } catch (error) {
     if (isRedirectError(error)) {
@@ -29,7 +30,7 @@ async function loginAction(formData: FormData) {
 async function googleAction() {
   "use server";
 
-  await signIn("google", { redirectTo: "/dashboard" });
+  await signIn("google", { redirectTo: "/admin" });
 }
 
 export default async function LoginPage({

@@ -179,6 +179,8 @@ model Workspace {
   members                     WorkspaceMember[]
   invites                     WorkspaceInvite[]
   contactCards                WorkspaceContactCard[]
+  automationRules             AutomationRule[]
+  billingRecords              BillingRecord[]
   messageLogs                 MessageLog[]
 }
 
@@ -491,6 +493,54 @@ model EmailBroadcast {
 
   @@index([status])
   @@index([createdAt])
+}
+
+model AutomationRule {
+  id              String    @id @default(cuid())
+  workspaceId     String?
+  name            String
+  triggerKind     String
+  message         String    @db.Text
+  audience        String    @default("campaign_participants")
+  scheduledAt     DateTime?
+  delayMinutes    Int?
+  isEnabled       Boolean   @default(true)
+  createdByUserId String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  workspace       Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([triggerKind])
+  @@index([scheduledAt])
+  @@index([isEnabled])
+}
+
+model BillingRecord {
+  id              String    @id @default(cuid())
+  workspaceId     String
+  label           String
+  amountCents     Int
+  status          String    @default("draft")
+  receiptNumber   String?
+  receiptUrl      String?   @db.Text
+  paidAt          DateTime?
+  createdByUserId String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model SiteSetting {
+  key             String   @id
+  value           String   @db.Text
+  updatedByUserId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
 
 model AdminAuditLog {
