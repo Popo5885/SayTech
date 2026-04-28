@@ -193,17 +193,9 @@ export function renderTemplate(
   template: string,
   values: TemplatePreviewContext
 ): string {
-  const validation = validateTemplate(template);
-
-  if (!validation.valid) {
-    throw new Error(
-      `Unknown template variables: ${validation.invalidVariables.join(", ")}`
-    );
-  }
-
-  return template.replace(VARIABLE_PATTERN, (_, variable: keyof TemplatePreviewContext) => {
+  return template.replace(VARIABLE_PATTERN, (match, variable: keyof TemplatePreviewContext) => {
     const value = values[variable];
-    return value === undefined || value === null ? "" : String(value);
+    return value === undefined || value === null ? match : String(value);
   });
 }
 

@@ -82,7 +82,10 @@ async function ensureDatabase(): Promise<void> {
 }
 
 function isSuperAdmin(session: any): boolean {
-  return session?.user?.globalRole === "SUPER_ADMIN";
+  const adminEmail = (process.env.SUPERADMIN_EMAIL ?? "aknvpupuch@gmail.com").toLowerCase();
+  const sessionEmail = session?.user?.email?.toLowerCase();
+
+  return session?.user?.globalRole === "SUPER_ADMIN" || sessionEmail === adminEmail;
 }
 
 function sessionUserId(session: any): string | null {

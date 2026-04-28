@@ -76,6 +76,46 @@ function groupForTemplate(key: MessageTemplateKey) {
   return editorGroups.find((group) => group.keys.includes(key)) ?? editorGroups[0];
 }
 
+function extractVariables(text: string): string[] {
+  const matches = text.match(/\{\{\s*[\w_]+\s*\}\}/g) ?? [];
+
+  return Array.from(
+    new Set(matches.map((match) => match.replace(/\s+/g, "").replace("{{", "{{").replace("}}", "}}")))
+  );
+}
+
+function buildAssistantDraft(prompt: string, template: CampaignMessageTemplate): string {
+  const request = prompt.trim();
+  const requestedVariables = extractVariables(request);
+  const extraVariables = requestedVariables.length > 0 ? `\n\n${requestedVariables.join(" ")}` : "";
+  const cleanRequest = request.replace(/\{\{\s*[\w_]+\s*\}\}/g, "").trim();
+  const contextLine = cleanRequest ? `\n\nהערה לקמפיין: ${cleanRequest}` : "";
+
+  switch (template.key) {
+    case "JOIN_WHATSAPP_PROMPT":
+      return `היי, אשמח להצטרף ל{{campaign_name}}. הגעתי דרך {{ref}}.${extraVariables}`;
+    case "WELCOME":
+      return `שלום {{name}}, ברוכים הבאים ל{{campaign_name}}.\nכדי להשלים את ההרשמה נבקש לשמור את איש הקשר, ולאחר מכן נשלח לך קישור אישי לשיתוף.${contextLine}${extraVariables}`;
+    case "SAVE_CONTACT_PROMPT":
+      return `כדי לקבל עדכונים על ההגרלה ב-WhatsApp, שמרו את איש הקשר שלנו ואז כתבו: שמרתי.${contextLine}${extraVariables}`;
+    case "REGISTRATION_PAUSED":
+      return `אין בעיה, נעצור כאן.\nאחרי ששמרתם את איש הקשר, כתבו לנו שמרתי ונמשיך בדיוק מאותה נקודה.${contextLine}${extraVariables}`;
+    case "LINK":
+      return `מעולה {{name}}, ההרשמה הושלמה.\nזה הקישור האישי שלך לשיתוף:\n{{link}}\n\nכל חבר שמצטרף דרך הקישור מוסיף לך כרטיסים להגרלה.${contextLine}${extraVariables}`;
+    case "STATUS_TICKETS":
+    case "SELF_STATUS":
+      return `שלום {{name}}, יש לך כרגע {{tickets}} כרטיסים ו-{{referrals}} הפניות מאושרות.\nהמיקום שלך: #{{rank}}\n\nהקישור האישי שלך:\n{{link}}${extraVariables}`;
+    case "WINNER":
+      return `ברכות {{name}}, זכית ב{{campaign_name}}.\nצוות העסק יצור איתך קשר במספר {{contact_phone}}.${contextLine}${extraVariables}`;
+    case "REFERRAL_UPDATE":
+      return `עדכון טוב, {{name}}.\nמשתתף חדש הצטרף דרך הקישור שלך. עכשיו יש לך {{referrals}} הפניות ו-{{tickets}} כרטיסים.${extraVariables}`;
+    case "LEADERBOARD_SUMMARY":
+      return `המובילים כרגע:\n{{top10}}${extraVariables}`;
+    default:
+      return request || template.value;
+  }
+}
+
 export function MessageEditor({
   campaignId,
   initialTemplates,
@@ -92,6 +132,7 @@ export function MessageEditor({
   const [activeTemplateId, setActiveTemplateId] = useState(initialTemplates[0]?.id ?? "");
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
   const [uploadingTemplateId, setUploadingTemplateId] = useState<string | null>(null);
+  const [aiPrompt, setAiPrompt] = useState("");
   const [isPending, startSaveTransition] = useTransition();
 
   const visibleTemplates = useMemo(
@@ -139,6 +180,17 @@ export function MessageEditor({
     updateTemplate(activeTemplate.id, {
       value: `${activeTemplate.value}${activeTemplate.value.endsWith(" ") ? "" : " "}${token}`
     });
+  }
+
+  function applyAssistantDraft(): void {
+    if (!activeTemplate) {
+      return;
+    }
+
+    updateTemplate(activeTemplate.id, {
+      value: buildAssistantDraft(aiPrompt, activeTemplate)
+    });
+    setSavedMessage("העוזר הכין טיוטה. אפשר לערוך ולשמור.");
   }
 
   function updateMediaType(templateId: string, mediaType: string): void {
@@ -313,8 +365,8 @@ export function MessageEditor({
                     <Badge tone={template.isEnabled ? "success" : "neutral"}>
                       {template.isEnabled ? "פעיל" : "כבוי"}
                     </Badge>
-                    <Badge tone={validation.valid ? "success" : "danger"}>
-                      {validation.valid ? "תקין" : "משתנה לא מוכר"}
+                    <Badge tone={validation.valid ? "success" : "warning"}>
+                      {validation.valid ? "תקין" : "משתנה חדש"}
                     </Badge>
                   </div>
                   <p className="mt-2 text-sm leading-6 text-stone-500">
@@ -345,6 +397,27 @@ export function MessageEditor({
                 </Button>
               </div>
 
+              <div className="rounded-3xl border border-emerald-200 bg-emerald-50/70 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-black text-emerald-950">עוזר כתיבה חכם</p>
+                    <p className="mt-1 text-sm leading-6 text-emerald-800">
+                      כתבו מה תרצו שההודעה תעשה, והמערכת תכין טיוטה בעברית. אפשר להשתמש גם במשתנים חדשים כמו <span dir="ltr">{"{{coupon}}"}</span>; הם לא יחסמו שמירה.
+                    </p>
+                  </div>
+                  <Button onClick={applyAssistantDraft} type="button" variant="secondary">
+                    צור טיוטה
+                  </Button>
+                </div>
+                <Textarea
+                  className="mt-3 min-h-[92px] bg-white text-right"
+                  dir="rtl"
+                  onChange={(event) => setAiPrompt(event.target.value)}
+                  placeholder="לדוגמה: תכתוב הודעת פתיחה קצרה, יוקרתית ומלהיבה, עם קופון {{coupon}}"
+                  value={aiPrompt}
+                />
+              </div>
+
               <div className="flex flex-wrap gap-2" data-tour="smart-variable">
                 {variableChips.map((chip) => (
                   <button
@@ -366,8 +439,8 @@ export function MessageEditor({
               />
 
               {!activeValidation.valid ? (
-                <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                  נמצאו משתנים לא מוכרים: {activeValidation.invalidVariables.join(", ")}
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                  נמצאו משתנים חדשים: {activeValidation.invalidVariables.join(", ")}. ההודעה עדיין תישמר ותישלח; משתנה שאין לו ערך יישאר בטקסט כפי שנכתב.
                 </div>
               ) : null}
 

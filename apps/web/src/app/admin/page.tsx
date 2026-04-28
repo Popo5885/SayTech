@@ -118,7 +118,7 @@ export default async function AdminPage() {
   const sessionEmail = session.user?.email?.toLowerCase();
   const adminEmail = ownerEmail().toLowerCase();
 
-  if ((session.user as any).globalRole !== "SUPER_ADMIN" || sessionEmail !== adminEmail) {
+  if (sessionEmail !== adminEmail) {
     redirect("/dashboard");
   }
 

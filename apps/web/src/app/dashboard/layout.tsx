@@ -16,9 +16,15 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
-  if ((session.user as any).accountStatus !== "active") {
+  const user = session.user as any;
+
+  if (user.accountStatus !== "active") {
     redirect("/pending");
   }
 
-  return <DashboardShell>{children}</DashboardShell>;
+  const adminEmail = (process.env.SUPERADMIN_EMAIL ?? "aknvpupuch@gmail.com").toLowerCase();
+  const isSuperAdmin =
+    user.globalRole === "SUPER_ADMIN" || user.email?.toLowerCase() === adminEmail;
+
+  return <DashboardShell isSuperAdmin={isSuperAdmin}>{children}</DashboardShell>;
 }

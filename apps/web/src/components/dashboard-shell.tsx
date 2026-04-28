@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
-import { Link2, LogOut, MessageSquareText, Trophy } from "lucide-react";
+import { Link2, LogOut, MessageSquareText, ShieldCheck, Trophy } from "lucide-react";
 import { cn } from "@lottery/ui";
 import { GuidedTourButton } from "./guided-tour-button";
 
@@ -14,11 +14,19 @@ const navItems = [
 ] as const;
 
 export function DashboardShell({
-  children
+  children,
+  isSuperAdmin = false
 }: {
   children: React.ReactNode;
+  isSuperAdmin?: boolean;
 }) {
   const pathname = usePathname();
+  const visibleNavItems = isSuperAdmin
+    ? [
+        ...navItems,
+        { href: "/admin", label: "ניהול", icon: ShieldCheck, tour: "admin-nav" }
+      ]
+    : navItems;
 
   return (
     <div className="min-h-screen bg-[#f7f8fb]" dir="rtl">
@@ -35,7 +43,7 @@ export function DashboardShell({
           </Link>
 
           <nav className="mt-7 space-y-2">
-            {navItems.map((item) => {
+            {visibleNavItems.map((item) => {
               const Icon = item.icon;
               const active = pathname === item.href;
 
@@ -74,8 +82,8 @@ export function DashboardShell({
             <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-950">
               לוח עבודה
             </h1>
-            <nav className="mt-4 grid grid-cols-3 gap-2 lg:hidden">
-              {navItems.map((item) => {
+            <nav className={cn("mt-4 grid gap-2 lg:hidden", isSuperAdmin ? "grid-cols-4" : "grid-cols-3")}>
+              {visibleNavItems.map((item) => {
                 const Icon = item.icon;
                 const active = pathname === item.href;
 
