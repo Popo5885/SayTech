@@ -1,6 +1,7 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
+import { createHash } from "node:crypto";
 import { WorkspaceRepository } from "@lottery/core";
 import { prisma } from "@lottery/db";
 import { verifyPassword } from "./lib/password";
@@ -18,12 +19,33 @@ export function isGoogleAuthConfigured() {
   return Boolean(GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET);
 }
 
+function resolveAuthSecret() {
+  const explicitSecret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
+
+  if (explicitSecret) {
+    return explicitSecret;
+  }
+
+  const stableServerSeed = [
+    process.env.DATABASE_URL,
+    process.env.RAILWAY_SERVICE_ID,
+    process.env.RAILWAY_ENVIRONMENT_ID,
+    process.env.NEXTAUTH_URL,
+    process.env.AUTH_URL
+  ]
+    .filter(Boolean)
+    .join("|");
+
+  if (stableServerSeed) {
+    return createHash("sha256").update(`magic-flow-auth:${stableServerSeed}`).digest("hex");
+  }
+
+  return "magic-flow-local-development-secret";
+}
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
-  secret:
-    process.env.AUTH_SECRET ??
-    process.env.NEXTAUTH_SECRET ??
-    (process.env.NODE_ENV === "production" ? undefined : "magic-flow-local-development-secret"),
+  secret: resolveAuthSecret(),
   pages: {
     signIn: "/login",
     error: "/login"
@@ -69,7 +91,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         });
 
         return {
-          id: user.id,
+          id: updatedUser.id,
           email: updatedUser.email,
           name: updatedUser.fullName ?? updatedUser.name ?? updatedUser.email,
           accountStatus: updatedUser.accountStatus,
@@ -156,8 +178,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         (user as any).id = linkedUser.id;
         (user as any).accountStatus = linkedUser.accountStatus;
-        (user as any).globalRole =
-          email === SYSTEM_ADMIN_EMAIL ? "SUPER_ADMIN" : linkedUser.globalRole;
+        (user as any).globalRole = isSystemAdmin ? "SUPER_ADMIN" : linkedUser.globalRole;
       }
 
       if ((user as any).accountStatus && (user as any).accountStatus !== "active") {

@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { encryptSecret } from "@lottery/core";
 import { prisma } from "@lottery/db";
-import { auth } from "../../auth";
+import { auth, isGoogleAuthConfigured } from "../../auth";
 import { ownerEmail, sendSystemEmail } from "../../lib/email";
 import { createVerificationCode, hashVerificationCode } from "../../lib/password";
 import { normalizeIsraeliPhone } from "../../lib/phone";
@@ -491,6 +491,32 @@ export default async function AdminPage({
   const siteContent = new Map<string, string>(
     siteSettings.map((setting: any) => [setting.key, String(setting.value)] as [string, string])
   );
+  const operationalChecks = [
+    {
+      label: "Auth",
+      value: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET ? "מוגדר" : "Fallback פעיל",
+      ok: Boolean(process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET),
+      note: "מומלץ להגדיר AUTH_SECRET קבוע ב-Railway."
+    },
+    {
+      label: "Google Login",
+      value: isGoogleAuthConfigured() ? "פעיל" : "חסר Client Secret",
+      ok: isGoogleAuthConfigured(),
+      note: "נדרש GOOGLE_CLIENT_SECRET כדי לאפשר כניסה והרשמה עם Google."
+    },
+    {
+      label: "SMTP",
+      value: process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS ? "פעיל" : "לא מוגדר",
+      ok: Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS),
+      note: "נדרש לשליחת איפוס סיסמה, אישורים וניוזלטרים."
+    },
+    {
+      label: "הצפנת טוקנים",
+      value: process.env.WORKSPACE_TOKEN_ENCRYPTION_KEY ? "מוגדר" : "חסר",
+      ok: Boolean(process.env.WORKSPACE_TOKEN_ENCRYPTION_KEY),
+      note: "חובה לשמירת טוקנים של WhatsApp Official בפרודקשן."
+    }
+  ];
 
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-8" dir="rtl">
@@ -501,6 +527,44 @@ export default async function AdminPage({
           <p className="mt-3 text-slate-300">לקוחות, חיבורים, אוטומציות, ניוזלטרים, קבלות ותוכן האתר במקום אחד.</p>
           <p className="mt-5 text-sm text-slate-400">מייל מנהל: <span dir="ltr">{ownerEmail()}</span></p>
         </header>
+
+        <section className="grid gap-4 xl:grid-cols-[1fr_1.2fr]">
+          <div className="rounded-[32px] bg-white p-6 shadow-sm">
+            <p className="text-sm font-black text-blue-700">מרכז תפעול מהיר</p>
+            <h2 className="mt-2 text-2xl font-black text-slate-950">כל פעולות הניהול החשובות</h2>
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              {[
+                ["לקוחות", "#customers", "אישור, השהיה וכניסה לממשק לקוח"],
+                ["חיבורי WhatsApp", "#connections", "הוספת Official או כלי צוות"],
+                ["אוטומציות", "#automations", "שליחה בזמן קבוע או אחרי הצטרפות"],
+                ["קבלות", "#billing", "תשלומים, קבלות ותוספים"]
+              ].map(([title, href, description]) => (
+                <a className="rounded-2xl border border-slate-200 bg-slate-50 p-4 transition hover:border-blue-200 hover:bg-blue-50" href={href} key={title}>
+                  <p className="font-black text-slate-950">{title}</p>
+                  <p className="mt-1 text-sm leading-6 text-slate-500">{description}</p>
+                </a>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-[32px] bg-white p-6 shadow-sm">
+            <p className="text-sm font-black text-emerald-700">בדיקת תצורת שרת</p>
+            <h2 className="mt-2 text-2xl font-black text-slate-950">מה צריך להיות פעיל בפרודקשן</h2>
+            <div className="mt-5 grid gap-3 md:grid-cols-2">
+              {operationalChecks.map((check) => (
+                <div className="rounded-2xl border border-slate-200 p-4" key={check.label}>
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="font-black text-slate-950">{check.label}</p>
+                    <span className={`rounded-full px-3 py-1 text-xs font-black ${check.ok ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>
+                      {check.value}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-sm leading-6 text-slate-500">{check.note}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
 
         {params?.error === "encryption-key" ? (
           <div className="rounded-[28px] border border-amber-200 bg-amber-50 p-5 text-sm font-bold leading-7 text-amber-900">
@@ -541,7 +605,7 @@ export default async function AdminPage({
           </div>
         </section>
 
-        <section className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+        <section className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]" id="customers">
           <div className="rounded-[32px] bg-white p-6 shadow-sm">
             <h2 className="text-2xl font-black text-slate-950">יצירת לקוח מהירה</h2>
             <p className="mt-2 text-sm leading-6 text-slate-500">פותח משתמש, שולח מייל בחירת סיסמה, ובבחירה שלך גם מפעיל סביבת עבודה מיד.</p>
@@ -606,7 +670,7 @@ export default async function AdminPage({
         </section>
 
         <section className="grid gap-6 xl:grid-cols-3">
-          <div className="rounded-[32px] bg-white p-6 shadow-sm">
+          <div className="rounded-[32px] bg-white p-6 shadow-sm" id="automations">
             <h2 className="text-xl font-black text-slate-950">אוטומציות</h2>
             <form action={createAutomationAction} className="mt-4 space-y-3">
               <Field label="לקוח">
@@ -642,7 +706,7 @@ export default async function AdminPage({
             </div>
           </div>
 
-          <div className="rounded-[32px] bg-white p-6 shadow-sm">
+          <div className="rounded-[32px] bg-white p-6 shadow-sm" id="newsletters">
             <h2 className="text-xl font-black text-slate-950">ניוזלטר</h2>
             <form action={createNewsletterDraftAction} className="mt-4 space-y-3">
               <Field label="קהל יעד">
@@ -740,7 +804,7 @@ export default async function AdminPage({
             </div>
           </div>
 
-          <div className="rounded-[32px] bg-white p-6 shadow-sm">
+          <div className="rounded-[32px] bg-white p-6 shadow-sm" id="billing">
             <h2 className="text-2xl font-black text-slate-950">קבלות ותשלומים</h2>
             <form action={createBillingAction} className="mt-5 grid gap-3 md:grid-cols-2">
               <Field label="לקוח">
