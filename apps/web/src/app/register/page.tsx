@@ -2,12 +2,23 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowLeft, Sparkles } from "lucide-react";
 import { prisma } from "@lottery/db";
+import { isGoogleAuthConfigured, signIn } from "../../auth";
 import { SuccessSubmitButton } from "../../components/success-submit-button";
 import { ownerEmail, sendSystemEmail } from "../../lib/email";
 import { hashPassword } from "../../lib/password";
 import { normalizeIsraeliPhone } from "../../lib/phone";
 
 const db = prisma as any;
+
+async function googleRegisterAction() {
+  "use server";
+
+  if (!isGoogleAuthConfigured()) {
+    redirect("/register?error=google-config");
+  }
+
+  await signIn("google", { redirectTo: "/register/google" });
+}
 
 async function registerAction(formData: FormData) {
   "use server";
@@ -71,7 +82,9 @@ export default async function RegisterPage({
 }) {
   const params = await searchParams;
   const hasError = params?.error === "missing";
+  const hasGoogleConfigError = params?.error === "google-config";
   const initialEmail = params?.email ?? "";
+  const googleReady = isGoogleAuthConfigured();
 
   return (
     <main className="aurora-surface relative min-h-screen overflow-hidden bg-[#070914] px-4 py-10 text-white" dir="rtl">
@@ -96,7 +109,7 @@ export default async function RegisterPage({
           <div className="mt-8 space-y-3 text-sm font-semibold text-slate-300">
             <p>1. שליחת בקשת הצטרפות</p>
             <p>2. בדיקה ידנית קצרה</p>
-            <p>3. קבלת גישה לדשבורד נקי ופשוט</p>
+            <p>3. קבלת גישה ללוח עבודה ברור ופשוט</p>
           </div>
         </section>
 
@@ -110,7 +123,28 @@ export default async function RegisterPage({
             </div>
           ) : null}
 
-          <form action={registerAction} className="mt-6 space-y-4">
+          {hasGoogleConfigError ? (
+            <div className="mt-5 rounded-3xl border border-amber-300/25 bg-amber-300/12 p-4 text-sm font-semibold text-amber-100">
+              הרשמה עם Google תופעל לאחר הגדרת Google OAuth בסביבת השרת.
+            </div>
+          ) : null}
+
+          {googleReady ? (
+            <>
+              <form action={googleRegisterAction} className="mt-6">
+                <button className="h-12 w-full rounded-2xl border border-white/10 bg-white text-sm font-black text-slate-950 transition hover:-translate-y-0.5" type="submit">
+                  הרשמה עם Google
+                </button>
+              </form>
+              <div className="my-6 flex items-center gap-3 text-sm text-slate-400">
+                <span className="h-px flex-1 bg-white/10" />
+                או הרשמה ידנית
+                <span className="h-px flex-1 bg-white/10" />
+              </div>
+            </>
+          ) : null}
+
+          <form action={registerAction} className={googleReady ? "space-y-4" : "mt-6 space-y-4"}>
             <label className="block">
               <span className="font-bold text-slate-200">שם מלא</span>
               <input className="mt-2 h-12 w-full rounded-2xl border border-white/10 bg-white/10 px-4 text-white outline-none transition focus:border-cyan-300 focus:shadow-[0_0_0_4px_rgba(34,211,238,0.12)]" name="fullName" required />

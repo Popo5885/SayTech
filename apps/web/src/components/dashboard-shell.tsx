@@ -3,14 +3,15 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
-import { Link2, LogOut, MessageSquareText, Trophy } from "lucide-react";
+import { Link2, LogOut, MessageSquareText, Settings, Trophy } from "lucide-react";
 import { cn } from "@lottery/ui";
 import { GuidedTourButton } from "./guided-tour-button";
 
 const navItems = [
   { href: "/dashboard/connections", label: "חיבור", icon: Link2, tour: "connection-nav" },
   { href: "/dashboard/messages", label: "הודעות", icon: MessageSquareText, tour: "messages-nav" },
-  { href: "/dashboard/analytics", label: "הגרלה", icon: Trophy, tour: "analytics-nav" }
+  { href: "/dashboard/analytics", label: "הגרלה", icon: Trophy, tour: "analytics-nav" },
+  { href: "/dashboard/settings", label: "הגדרות", icon: Settings, tour: "settings-nav" }
 ] as const;
 
 export function DashboardShell({
@@ -74,7 +75,7 @@ export function DashboardShell({
             <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-950">
               לוח עבודה
             </h1>
-            <nav className="mt-4 grid grid-cols-3 gap-2 lg:hidden">
+            <nav className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:hidden">
               {navItems.map((item) => {
                 const Icon = item.icon;
                 const active = pathname === item.href;

@@ -97,13 +97,13 @@ export default async function LandingPage() {
   const landingTitle = landingContent.title || "הגרלה ויראלית ב-WhatsApp, בלי כאב ראש.";
   const landingSubtitle =
     landingContent.subtitle ||
-    "Magic Flow עוזרת לבעלי עסקים ליצור הגרלה, לאסוף משתתפים, לזהות מפנים, לשמור אנשי קשר ולבצע הגרלה שקופה. הכל בעברית, פשוט ונקי.";
+    "Magic Flow עוזרת לבעלי עסקים ליצור הגרלה, לאסוף משתתפים, לזהות מפנים, לשמור אנשי קשר ולבצע הגרלה שקופה. הכל בעברית, פשוט וברור.";
   const landingPrice = landingContent.price || "999 ₪";
   const pricingTiers = [
     {
       name: "Starter",
       price: "499 ₪",
-      badge: "כניסה נקייה",
+      badge: "מתחילים מסודר",
       glow: "from-slate-200/18 to-white/[0.04]",
       features: ["קמפיין אחד", "עד 500 משתתפים", "WhatsApp Official כלול", "משימת סטטוס בסיסית", "ללא מבצעי בזק"]
     },
@@ -176,7 +176,7 @@ export default async function LandingPage() {
           </div>
 
           <div className="flex flex-wrap gap-3">
-            <Link className="group inline-flex h-14 items-center gap-2 rounded-2xl bg-gradient-to-l from-cyan-300 to-violet-500 px-6 text-base font-black text-slate-950 shadow-[0_18px_70px_rgba(34,211,238,0.22)] transition hover:-translate-y-0.5" href="/register">
+            <Link className="shimmer-action group inline-flex h-14 items-center gap-2 rounded-2xl bg-gradient-to-l from-cyan-300 to-violet-500 px-6 text-base font-black text-slate-950 shadow-[0_18px_70px_rgba(34,211,238,0.22)] transition hover:-translate-y-0.5" href="/register">
               התחלת הרשמה
               <ArrowLeft className="h-5 w-5 transition group-hover:-translate-x-1" />
             </Link>
@@ -292,7 +292,7 @@ export default async function LandingPage() {
               </div>
               <h3 className="mt-6 text-3xl font-black">{tier.name}</h3>
               <div className="mt-4 text-5xl font-black">{tier.price}</div>
-              <p className="mt-2 text-sm font-semibold text-slate-400">לחודש, ללא נתונים מומצאים וללא מסכים עמוסים.</p>
+              <p className="mt-2 text-sm font-semibold text-slate-400">לחודש, עם נתונים אמיתיים ומסכים שמתמקדים בעבודה.</p>
               <ul className="mt-7 space-y-3 text-right">
                 {tier.features.map((feature) => (
                   <li className="flex items-start gap-3 text-sm font-bold leading-6 text-slate-200" key={feature}>
@@ -301,7 +301,7 @@ export default async function LandingPage() {
                   </li>
                 ))}
               </ul>
-              <Link className="mt-8 inline-flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-white px-5 py-4 font-black text-slate-950 transition hover:-translate-y-0.5 hover:shadow-[0_0_40px_rgba(34,211,238,0.25)]" href="/contact">
+              <Link className="shimmer-action mt-8 inline-flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-white px-5 py-4 font-black text-slate-950 transition hover:-translate-y-0.5 hover:shadow-[0_0_40px_rgba(34,211,238,0.25)]" href="/contact">
                 דברו עם הצוות
                 <MousePointer2 className="h-5 w-5" />
               </Link>

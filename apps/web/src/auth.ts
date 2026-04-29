@@ -4,22 +4,29 @@ import Google from "next-auth/providers/google";
 import { WorkspaceRepository } from "@lottery/core";
 import { prisma } from "@lottery/db";
 import { verifyPassword } from "./lib/password";
-import { normalizeIsraeliPhone } from "./lib/phone";
 
 const DEFAULT_GOOGLE_CLIENT_ID =
   "455116448878-mlsaq4mflpdm8fpkisnak26tjhmtduf3.apps.googleusercontent.com";
 const SYSTEM_ADMIN_EMAIL = (process.env.SUPERADMIN_EMAIL ?? "aknvpupuch@gmail.com").toLowerCase();
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID ?? DEFAULT_GOOGLE_CLIENT_ID;
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET ?? "";
 
 const db = prisma as any;
 const workspaceRepository = new WorkspaceRepository();
 
+export function isGoogleAuthConfigured() {
+  return Boolean(GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET);
+}
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  trustHost: true,
   secret:
     process.env.AUTH_SECRET ??
     process.env.NEXTAUTH_SECRET ??
     (process.env.NODE_ENV === "production" ? undefined : "magic-flow-local-development-secret"),
   pages: {
-    signIn: "/login"
+    signIn: "/login",
+    error: "/login"
   },
   session: {
     strategy: "jwt"
@@ -45,33 +52,48 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           return null;
         }
 
-        await db.user.update({
+        const isSystemAdmin = email === SYSTEM_ADMIN_EMAIL;
+
+        const updatedUser = await db.user.update({
           where: { id: user.id },
-          data: { lastLoginAt: new Date() }
+          data: {
+            lastLoginAt: new Date(),
+            ...(isSystemAdmin
+              ? {
+                  accountStatus: "active",
+                  globalRole: "SUPER_ADMIN",
+                  approvedAt: user.approvedAt ?? new Date()
+                }
+              : {})
+          }
         });
 
         return {
           id: user.id,
-          email: user.email,
-          name: user.fullName ?? user.name ?? user.email,
-          accountStatus: user.accountStatus,
-          globalRole: email === SYSTEM_ADMIN_EMAIL ? "SUPER_ADMIN" : user.globalRole
+          email: updatedUser.email,
+          name: updatedUser.fullName ?? updatedUser.name ?? updatedUser.email,
+          accountStatus: updatedUser.accountStatus,
+          globalRole: isSystemAdmin ? "SUPER_ADMIN" : updatedUser.globalRole
         } as any;
       }
     }),
-    Google({
-      clientId: process.env.GOOGLE_CLIENT_ID ?? DEFAULT_GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
-      authorization: {
-        params: {
-          access_type: "offline",
-          prompt: "consent",
-          response_type: "code",
-          scope:
-            "openid email profile https://www.googleapis.com/auth/contacts"
-        }
-      }
-    })
+    ...(isGoogleAuthConfigured()
+      ? [
+          Google({
+            clientId: GOOGLE_CLIENT_ID,
+            clientSecret: GOOGLE_CLIENT_SECRET,
+            authorization: {
+              params: {
+                access_type: "offline",
+                prompt: "consent",
+                response_type: "code",
+                scope:
+                  "openid email profile https://www.googleapis.com/auth/contacts"
+              }
+            }
+          })
+        ]
+      : [])
   ],
   callbacks: {
     async signIn({ user, account }) {
@@ -81,6 +103,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         account.providerAccountId
       ) {
         const email = user.email.toLowerCase();
+        const isSystemAdmin = email === SYSTEM_ADMIN_EMAIL;
         const existingUser = await db.user.findUnique({ where: { email } });
         const linkedUser = await db.user.upsert({
           where: { email },
@@ -88,6 +111,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             googleSubject: account.providerAccountId,
             fullName: existingUser?.fullName ?? user.name ?? user.email,
             name: existingUser?.name ?? user.name ?? user.email,
+            globalRole: isSystemAdmin ? "SUPER_ADMIN" : existingUser?.globalRole,
+            accountStatus: isSystemAdmin ? "active" : existingUser?.accountStatus,
+            approvedAt: isSystemAdmin && !existingUser?.approvedAt ? new Date() : existingUser?.approvedAt,
             lastLoginAt: new Date()
           },
           create: {
@@ -95,8 +121,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             googleSubject: account.providerAccountId,
             fullName: user.name ?? user.email,
             name: user.name ?? user.email,
-            accountStatus: "pending",
-            phone: normalizeIsraeliPhone(null)
+            accountStatus: isSystemAdmin ? "active" : "pending",
+            globalRole: isSystemAdmin ? "SUPER_ADMIN" : "USER",
+            approvedAt: isSystemAdmin ? new Date() : null,
+            phone: null
           }
         });
 
@@ -130,10 +158,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         (user as any).accountStatus = linkedUser.accountStatus;
         (user as any).globalRole =
           email === SYSTEM_ADMIN_EMAIL ? "SUPER_ADMIN" : linkedUser.globalRole;
-
-        if (linkedUser.accountStatus !== "active") {
-          return "/waiting-room";
-        }
       }
 
       if ((user as any).accountStatus && (user as any).accountStatus !== "active") {

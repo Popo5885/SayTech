@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { ArrowLeft, Sparkles } from "lucide-react";
-import { signIn } from "../../auth";
+import { isGoogleAuthConfigured, signIn } from "../../auth";
 import { SuccessSubmitButton } from "../../components/success-submit-button";
 
 async function loginAction(formData: FormData) {
@@ -30,6 +30,10 @@ async function loginAction(formData: FormData) {
 async function googleAction() {
   "use server";
 
+  if (!isGoogleAuthConfigured()) {
+    redirect("/login?error=google-config");
+  }
+
   await signIn("google", { redirectTo: "/admin" });
 }
 
@@ -40,7 +44,9 @@ export default async function LoginPage({
 }) {
   const params = await searchParams;
   const hasCredentialsError = params?.error === "credentials" || params?.error === "CredentialsSignin";
+  const hasConfigError = params?.error === "Configuration" || params?.error === "google-config";
   const triedEmail = params?.email ?? "";
+  const googleReady = isGoogleAuthConfigured();
   const registerHref = triedEmail
     ? `/register?email=${encodeURIComponent(triedEmail)}`
     : "/register";
@@ -61,9 +67,9 @@ export default async function LoginPage({
             </span>
             Magic Flow
           </Link>
-          <h1 className="mt-16 text-4xl font-black leading-tight md:text-5xl">כניסה שקטה למערכת</h1>
+          <h1 className="mt-16 text-4xl font-black leading-tight md:text-5xl">כניסה למערכת</h1>
           <p className="mt-5 text-lg leading-8 text-slate-300">
-            אחרי שהחשבון מופעל, נכנסים ללוח עבודה קצר: חיבור, הודעות והגרלה בלבד.
+            נכנסים ללוח עבודה ברור עם הפעולות החשובות: חיבור, הודעות והגרלה.
           </p>
           <div className="mt-8 rounded-3xl border border-emerald-300/20 bg-emerald-300/10 p-5 text-sm font-semibold leading-7 text-emerald-100">
             חשבון שממתין לאישור יעבור אוטומטית למסך המתנה מסודר.
@@ -81,6 +87,12 @@ export default async function LoginPage({
                 פתיחת חשבון עכשיו
                 <ArrowLeft className="h-4 w-4" />
               </Link>
+            </div>
+          ) : null}
+
+          {hasConfigError ? (
+            <div className="mt-5 rounded-3xl border border-red-300/25 bg-red-300/12 p-4 text-sm font-semibold leading-7 text-red-100">
+              יש בעיה בהגדרות ההתחברות של השרת. צריך לוודא שב-Railway מוגדרים `AUTH_SECRET`, `NEXTAUTH_URL`, ובשביל Google גם `GOOGLE_CLIENT_SECRET`.
             </div>
           ) : null}
 
@@ -117,11 +129,17 @@ export default async function LoginPage({
             <span className="h-px flex-1 bg-white/10" />
           </div>
 
-          <form action={googleAction}>
-            <button className="h-12 w-full rounded-2xl border border-white/10 bg-white text-sm font-black text-slate-950 transition hover:-translate-y-0.5" type="submit">
-              כניסה עם Google
-            </button>
-          </form>
+          {googleReady ? (
+            <form action={googleAction}>
+              <button className="h-12 w-full rounded-2xl border border-white/10 bg-white text-sm font-black text-slate-950 transition hover:-translate-y-0.5" type="submit">
+                כניסה עם Google
+              </button>
+            </form>
+          ) : (
+            <div className="rounded-2xl border border-white/10 bg-white/10 p-4 text-sm font-semibold leading-7 text-slate-200">
+              התחברות Google תופעל לאחר הגדרת Google OAuth בסביבת השרת.
+            </div>
+          )}
 
           <p className="mt-6 text-sm text-slate-300">
             עדיין אין חשבון? <Link className="font-bold text-cyan-200 hover:text-white" href="/register">הרשמה</Link>
