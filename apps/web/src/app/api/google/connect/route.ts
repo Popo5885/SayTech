@@ -7,7 +7,7 @@ export async function GET(request: Request) {
         error:
           "Missing GOOGLE_CLIENT_SECRET. Add it before completing the Google Contacts OAuth flow."
       },
-      { status: 500 }
+      { status: 500, headers: { "Content-Type": "application/json; charset=utf-8" } }
     );
   }
 

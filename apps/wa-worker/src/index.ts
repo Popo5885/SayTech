@@ -44,9 +44,13 @@ async function main() {
     connectionId: connection.connectionId,
     sessionKey: connection.sessionKey,
     provider: connection.provider,
-    officialPhoneNumberId: connection.officialPhoneNumberId,
+    officialPhoneNumberId: connection.officialPhoneNumberId ?? process.env.WHATSAPP_PHONE_NUMBER_ID ?? null,
     officialWabaId: connection.officialWabaId,
-    officialAccessToken: connection.officialAccessToken ?? process.env.META_WHATSAPP_ACCESS_TOKEN ?? null
+    officialAccessToken:
+      connection.officialAccessToken ??
+      process.env.WHATSAPP_ACCESS_TOKEN ??
+      process.env.META_WHATSAPP_ACCESS_TOKEN ??
+      null
   });
 
   process.stdout.write(`WhatsApp worker listening on Socket.IO port ${socketPort}\n`);

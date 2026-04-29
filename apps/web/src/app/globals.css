@@ -396,3 +396,32 @@ body {
     transform: translate3d(-4%, -3%, 0) rotate(-8deg);
   }
 }
+
+@media (max-width: 768px), (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .orb-drift,
+  .orb-drift-slow,
+  .orb-drift-reverse,
+  .particle-field span,
+  .logo-pulse,
+  .shimmer-action::after,
+  .border-beam-card::before,
+  .aurora-surface::before,
+  .animated-gradient-text {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+  }
+
+  .tilt-card:hover,
+  .glass-lift:hover {
+    transform: translateZ(0);
+  }
+
+  .particle-field,
+  .noise-layer {
+    display: none;
+  }
+}

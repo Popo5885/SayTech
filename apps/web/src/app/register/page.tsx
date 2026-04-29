@@ -2,10 +2,11 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowLeft, Sparkles } from "lucide-react";
 import { prisma } from "@lottery/db";
-import { isGoogleAuthConfigured, signIn } from "../../auth";
+import { signIn } from "../../auth";
 import { SuccessSubmitButton } from "../../components/success-submit-button";
+import { getAuthFeatureSettings, isGoogleLoginEnabled } from "../../lib/auth-settings";
 import { ownerEmail, sendSystemEmail } from "../../lib/email";
-import { hashPassword } from "../../lib/password";
+import { hashPassword, isEnglishPassword } from "../../lib/password";
 import { normalizeIsraeliPhone } from "../../lib/phone";
 
 const db = prisma as any;
@@ -13,7 +14,7 @@ const db = prisma as any;
 async function googleRegisterAction() {
   "use server";
 
-  if (!isGoogleAuthConfigured()) {
+  if (!(await isGoogleLoginEnabled())) {
     redirect("/register?error=google-config");
   }
 
@@ -29,7 +30,7 @@ async function registerAction(formData: FormData) {
   const phone = normalizeIsraeliPhone(String(formData.get("phone") ?? ""));
   const accepted = formData.get("accepted") === "on";
 
-  if (!fullName || !email || password.length < 8 || !phone || !accepted) {
+  if (!fullName || !email || !isEnglishPassword(password) || !phone || !accepted) {
     redirect(`/register?error=missing&email=${encodeURIComponent(email)}`);
   }
 
@@ -84,7 +85,7 @@ export default async function RegisterPage({
   const hasError = params?.error === "missing";
   const hasGoogleConfigError = params?.error === "google-config";
   const initialEmail = params?.email ?? "";
-  const googleReady = isGoogleAuthConfigured();
+  const googleReady = (await getAuthFeatureSettings()).googleLoginEnabled;
 
   return (
     <main className="aurora-surface relative min-h-screen overflow-hidden bg-[#070914] px-4 py-10 text-white" dir="rtl">
@@ -125,7 +126,7 @@ export default async function RegisterPage({
 
           {hasGoogleConfigError ? (
             <div className="mt-5 rounded-3xl border border-amber-300/25 bg-amber-300/12 p-4 text-sm font-semibold text-amber-100">
-              הרשמה עם Google תופעל לאחר הגדרת Google OAuth בסביבת השרת.
+              הרשמה עם Google תופעל לאחר הגדרת GOOGLE_CLIENT_SECRET והפעלה בממשק הניהול.
             </div>
           ) : null}
 
@@ -155,7 +156,7 @@ export default async function RegisterPage({
             </label>
             <label className="block">
               <span className="font-bold text-slate-200">סיסמה</span>
-              <input className="mt-2 h-12 w-full rounded-2xl border border-white/10 bg-white/10 px-4 text-white outline-none transition focus:border-cyan-300 focus:shadow-[0_0_0_4px_rgba(34,211,238,0.12)]" minLength={8} name="password" required type="password" />
+              <input className="mt-2 h-12 w-full rounded-2xl border border-white/10 bg-white/10 px-4 text-white outline-none transition focus:border-cyan-300 focus:shadow-[0_0_0_4px_rgba(34,211,238,0.12)]" minLength={8} name="password" pattern="[A-Za-z0-9]+" required title="סיסמה באנגלית ומספרים בלבד" type="password" />
             </label>
             <label className="block">
               <span className="font-bold text-slate-200">טלפון</span>

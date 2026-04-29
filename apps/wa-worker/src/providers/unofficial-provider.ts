@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import qrcode from "qrcode";
 import WhatsAppWebJs, { type Message } from "whatsapp-web.js";
 import type {
+  ContactCardMessage,
   ConnectionSnapshot,
   IncomingWhatsAppMessage,
   OutboundWhatsAppMessage,
@@ -68,6 +69,53 @@ function normalizeDetectedPhone(value: string | null | undefined): string | null
 
 function normalizeOutboundTarget(target: string): string {
   return target.includes("@") ? target : `${target.replace(/^\+/, "")}@c.us`;
+}
+
+function normalizePhone(phone: string): string {
+  const compact = phone.replace(/[^\d+]/g, "");
+
+  if (!compact) {
+    return "";
+  }
+
+  if (compact.startsWith("+")) {
+    return compact;
+  }
+
+  if (compact.startsWith("972")) {
+    return `+${compact}`;
+  }
+
+  if (compact.startsWith("0")) {
+    return `+972${compact.slice(1)}`;
+  }
+
+  return `+${compact}`;
+}
+
+function escapeVcard(value: string): string {
+  return value
+    .replace(/\\/g, "\\\\")
+    .replace(/\r?\n/g, "\\n")
+    .replace(/,/g, "\\,")
+    .replace(/;/g, "\\;");
+}
+
+function buildVcf(cards: ContactCardMessage[]): string {
+  return `${cards
+    .map((card) =>
+      [
+        "BEGIN:VCARD",
+        "VERSION:3.0",
+        `FN:${escapeVcard(card.displayName)}`,
+        card.organization ? `ORG:${escapeVcard(card.organization)}` : null,
+        `TEL;TYPE=CELL:${normalizePhone(card.phone)}`,
+        "END:VCARD"
+      ]
+        .filter(Boolean)
+        .join("\r\n")
+    )
+    .join("\r\n")}\r\n`;
 }
 
 function isDirectCustomerChat(chatAddress: string): boolean {
@@ -322,6 +370,20 @@ export class UnofficialQrProvider implements WhatsAppProvider {
     }
 
     const target = normalizeOutboundTarget(message.to);
+
+    if (message.contactCards?.length) {
+      const media = new MessageMedia(
+        "text/vcard",
+        Buffer.from(buildVcf(message.contactCards), "utf8").toString("base64"),
+        message.contactCards.length > 2 ? "magic-flow-contacts.vcf" : "magic-flow-contact.vcf"
+      );
+
+      await client.sendMessage(target, media, {
+        caption: message.body || undefined,
+        sendMediaAsDocument: true
+      });
+      return;
+    }
 
     if (message.mediaUrl) {
       const media = await MessageMedia.fromUrl(message.mediaUrl, {

@@ -8,9 +8,11 @@ import {
   type GoogleSyncAccount,
   type Participant
 } from "@lottery/core";
+import { prisma } from "@lottery/db";
 
 const DEFAULT_GOOGLE_CLIENT_ID =
   "455116448878-mlsaq4mflpdm8fpkisnak26tjhmtduf3.apps.googleusercontent.com";
+const db = prisma as any;
 
 function normalizePhone(phone: string): string {
   const normalized = phone.replace(/[^\d+]/g, "");
@@ -246,23 +248,66 @@ export class GoogleContactsSyncService {
     workspaceId: string,
     participant: Participant
   ): Promise<boolean> {
-    const account = await this.workspaceRepository.getGoogleSyncAccount(workspaceId);
-
-    if (!account) {
-      return false;
-    }
-
-    const existingLedger = await this.ledgerRepository.findByPhone(workspaceId, participant.phone);
+    const normalizedPhone = normalizePhone(participant.phone);
+    const displayNameFallback = `${participant.name || "משתתף"}+בוט`;
+    const existingLedger = await this.ledgerRepository.findByPhone(workspaceId, normalizedPhone);
 
     if (existingLedger) {
       await this.ledgerRepository.upsert({
         workspaceId,
-        phone: participant.phone,
+        phone: normalizedPhone,
         displayName: existingLedger.displayName,
         googlePersonResourceName: existingLedger.googlePersonResourceName,
         lastCampaignId: participant.campaignId,
         syncedAt: existingLedger.syncedAt ? new Date(existingLedger.syncedAt) : null,
+        status: existingLedger.status === "quota_exceeded" ? "quota_exceeded" : "duplicate",
+        quotaCounted: Boolean(existingLedger.quotaCounted),
         lastCheckedAt: new Date()
+      });
+      return false;
+    }
+
+    const quota = await db.workspace.findUnique({
+      where: { id: workspaceId },
+      select: {
+        contactBotBaseQuota: true,
+        contactBotExtraQuota: true,
+        contactBotUsedQuota: true
+      }
+    });
+    const quotaLimit = (quota?.contactBotBaseQuota ?? 600) + (quota?.contactBotExtraQuota ?? 0);
+    const usedQuota = quota?.contactBotUsedQuota ?? 0;
+
+    if (usedQuota >= quotaLimit) {
+      await this.ledgerRepository.upsert({
+        workspaceId,
+        phone: normalizedPhone,
+        displayName: displayNameFallback,
+        lastCampaignId: participant.campaignId,
+        syncedAt: null,
+        status: "quota_exceeded",
+        quotaCounted: false,
+        lastCheckedAt: new Date()
+      });
+      return false;
+    }
+
+    const account = await this.workspaceRepository.getGoogleSyncAccount(workspaceId);
+
+    if (!account) {
+      await this.ledgerRepository.upsert({
+        workspaceId,
+        phone: normalizedPhone,
+        displayName: displayNameFallback,
+        lastCampaignId: participant.campaignId,
+        syncedAt: null,
+        status: "saved_system",
+        quotaCounted: true,
+        lastCheckedAt: new Date()
+      });
+      await db.workspace.update({
+        where: { id: workspaceId },
+        data: { contactBotUsedQuota: { increment: 1 } }
       });
       return false;
     }
@@ -277,13 +322,21 @@ export class GoogleContactsSyncService {
 
     await this.ledgerRepository.upsert({
       workspaceId,
-      phone: participant.phone,
+      phone: normalizedPhone,
       displayName: result.displayName,
       googlePersonResourceName: result.personResourceName,
       lastCampaignId: participant.campaignId,
       syncedAt: new Date(),
+      status: result.created ? "synced_google" : "duplicate",
+      quotaCounted: result.created,
       lastCheckedAt: new Date()
     });
+    if (result.created) {
+      await db.workspace.update({
+        where: { id: workspaceId },
+        data: { contactBotUsedQuota: { increment: 1 } }
+      });
+    }
 
     return result.created;
   }

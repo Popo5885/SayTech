@@ -7,11 +7,13 @@ import {
   renderTemplate,
   type Campaign,
   type CampaignLiveState,
+  type ContactCardMessage,
   type IncomingWhatsAppMessage,
   type MessageTemplateKey,
   type OutboundWhatsAppMessage,
   type Participant
 } from "@lottery/core";
+import { prisma } from "@lottery/db";
 
 export interface ContactSyncTarget {
   workspaceId: string;
@@ -32,6 +34,7 @@ const MENU_MATCHERS = ["תפריט", "menu", "help", "אפשרויות"];
 const NEGATIVE_REFERRER_MATCHERS = ["אין", "לא", "none", "nobody"];
 const CONTACT_SAVED_YES_MATCHERS = ["שמרתי", "שמרתי!", "כן", "yes", "saved"];
 const CONTACT_SAVED_NO_MATCHERS = ["לא שמרתי", "לא", "no", "not saved"];
+const db = prisma as any;
 
 function normalizePhoneCandidate(value: string): string | null {
   const digits = value.replace(/[^\d+]/g, "");
@@ -170,12 +173,7 @@ export class CampaignService {
           break;
         }
 
-        await this.appendTemplateMessage(
-          outbound,
-          campaign,
-          currentParticipant,
-          "SAVE_CONTACT_PROMPT"
-        );
+        await this.appendSaveContactPrompt(outbound, campaign, currentParticipant);
         break;
 
       case "AWAITING_REFERRER":
@@ -216,12 +214,7 @@ export class CampaignService {
           break;
         }
 
-        await this.appendTemplateMessage(
-          outbound,
-          campaign,
-          currentParticipant,
-          "SAVE_CONTACT_PROMPT"
-        );
+        await this.appendSaveContactPrompt(outbound, campaign, currentParticipant);
         break;
 
       case "AWAITING_CONTACT_SAVED":
@@ -251,12 +244,7 @@ export class CampaignService {
           break;
         }
 
-        await this.appendTemplateMessage(
-          outbound,
-          campaign,
-          currentParticipant,
-          "SAVE_CONTACT_PROMPT"
-        );
+        await this.appendSaveContactPrompt(outbound, campaign, currentParticipant);
         break;
 
       case "REGISTERED":
@@ -437,6 +425,57 @@ export class CampaignService {
 
   private isTemplateEnabled(campaign: Campaign, key: MessageTemplateKey): boolean {
     return campaign.templates.find((template) => template.key === key)?.isEnabled !== false;
+  }
+
+  private async getWorkspaceContactCards(workspaceId: string): Promise<ContactCardMessage[]> {
+    const cards = await db.workspaceContactCard.findMany({
+      where: {
+        workspaceId,
+        isEnabled: true
+      },
+      orderBy: [
+        {
+          sortOrder: "asc"
+        },
+        {
+          createdAt: "asc"
+        }
+      ]
+    });
+
+    return cards.map((card: any) => ({
+      displayName: card.displayName,
+      phone: card.phone,
+      organization: card.organization ?? null
+    }));
+  }
+
+  private async appendSaveContactPrompt(
+    outbound: OutboundWhatsAppMessage[],
+    campaign: Campaign,
+    participant: Participant
+  ): Promise<void> {
+    await this.appendTemplateMessage(outbound, campaign, participant, "SAVE_CONTACT_PROMPT");
+
+    const contactCards = await this.getWorkspaceContactCards(campaign.workspaceId);
+
+    if (contactCards.length === 0) {
+      return;
+    }
+
+    outbound.push({
+      connectionId: campaign.connectionId,
+      to: participant.chatAddress ?? participant.phone,
+      body:
+        contactCards.length > 2
+          ? "מצורף קובץ אנשי קשר לשמירה מהירה בטלפון."
+          : "זה כרטיס איש הקשר לשמירה בטלפון.",
+      mediaUrl: null,
+      mediaType: null,
+      interactive: null,
+      contactCards,
+      contactDeliveryMode: contactCards.length > 2 ? "VCARD_FILE" : "CONTACT_CARD"
+    });
   }
 
   private async appendTemplateMessage(

@@ -1,0 +1,142 @@
+import { prisma } from "@lottery/db";
+
+const db = prisma as any;
+
+export const AUTH_SETTING_KEYS = {
+  googleLoginEnabled: "auth_google_login_enabled",
+  whatsappLoginEnabled: "auth_whatsapp_login_enabled",
+  whatsappManualCodeEnabled: "auth_whatsapp_manual_code_enabled"
+} as const;
+
+function parseBoolean(value: string | null | undefined): boolean | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  const normalized = value.trim().toLowerCase();
+
+  if (["1", "true", "yes", "on", "enabled"].includes(normalized)) {
+    return true;
+  }
+
+  if (["0", "false", "no", "off", "disabled"].includes(normalized)) {
+    return false;
+  }
+
+  return null;
+}
+
+function googleClientId(): string {
+  return (
+    process.env.GOOGLE_CLIENT_ID ??
+    "455116448878-mlsaq4mflpdm8fpkisnak26tjhmtduf3.apps.googleusercontent.com"
+  );
+}
+
+export function isGoogleOAuthConfigured(): boolean {
+  return Boolean(googleClientId() && process.env.GOOGLE_CLIENT_SECRET);
+}
+
+export function isEnvWhatsAppSenderConfigured(): boolean {
+  return Boolean(
+    (process.env.WHATSAPP_ACCESS_TOKEN ?? process.env.META_WHATSAPP_ACCESS_TOKEN) &&
+      process.env.WHATSAPP_PHONE_NUMBER_ID
+  );
+}
+
+export async function hasOfficialWhatsAppSender(): Promise<boolean> {
+  if (isEnvWhatsAppSenderConfigured()) {
+    return true;
+  }
+
+  const envAccessToken = process.env.WHATSAPP_ACCESS_TOKEN ?? process.env.META_WHATSAPP_ACCESS_TOKEN;
+  const connection = await db.whatsAppConnection.findFirst({
+    where: {
+      provider: "official_business",
+      officialPhoneNumberId: {
+        not: null
+      },
+      ...(envAccessToken
+        ? {}
+        : {
+            officialAccessTokenEncrypted: {
+              not: null
+            }
+          })
+    },
+    select: {
+      id: true
+    }
+  });
+
+  return Boolean(connection);
+}
+
+async function getSettingsMap(): Promise<Map<string, string>> {
+  const keys = Object.values(AUTH_SETTING_KEYS);
+  const settings = await db.siteSetting.findMany({
+    where: {
+      key: {
+        in: keys
+      }
+    }
+  });
+
+  return new Map<string, string>(
+    settings.map((setting: any) => [String(setting.key), String(setting.value)])
+  );
+}
+
+export async function setAuthFeatureSetting(
+  key: (typeof AUTH_SETTING_KEYS)[keyof typeof AUTH_SETTING_KEYS],
+  enabled: boolean,
+  updatedByUserId?: string | null
+) {
+  return db.siteSetting.upsert({
+    where: { key },
+    update: {
+      value: enabled ? "true" : "false",
+      updatedByUserId: updatedByUserId ?? null
+    },
+    create: {
+      key,
+      value: enabled ? "true" : "false",
+      updatedByUserId: updatedByUserId ?? null
+    }
+  });
+}
+
+export async function getAuthFeatureSettings() {
+  const settings = await getSettingsMap();
+  const googleEnabledSetting =
+    parseBoolean(settings.get(AUTH_SETTING_KEYS.googleLoginEnabled)) ??
+    parseBoolean(process.env.AUTH_GOOGLE_LOGIN_ENABLED) ??
+    false;
+  const whatsappEnabledSetting =
+    parseBoolean(settings.get(AUTH_SETTING_KEYS.whatsappLoginEnabled)) ??
+    parseBoolean(process.env.AUTH_WHATSAPP_LOGIN_ENABLED) ??
+    false;
+  const manualCodeEnabled =
+    parseBoolean(settings.get(AUTH_SETTING_KEYS.whatsappManualCodeEnabled)) ??
+    parseBoolean(process.env.AUTH_WHATSAPP_MANUAL_CODE_ENABLED) ??
+    true;
+  const googleConfigured = isGoogleOAuthConfigured();
+  const whatsappSenderConfigured = await hasOfficialWhatsAppSender();
+
+  return {
+    googleConfigured,
+    googleLoginAdminEnabled: googleEnabledSetting,
+    googleLoginEnabled: googleConfigured && googleEnabledSetting,
+    whatsappLoginEnabled: whatsappEnabledSetting,
+    whatsappManualCodeEnabled: manualCodeEnabled,
+    whatsappSenderConfigured
+  };
+}
+
+export async function isGoogleLoginEnabled(): Promise<boolean> {
+  return (await getAuthFeatureSettings()).googleLoginEnabled;
+}
+
+export async function isWhatsAppLoginEnabled(): Promise<boolean> {
+  return (await getAuthFeatureSettings()).whatsappLoginEnabled;
+}

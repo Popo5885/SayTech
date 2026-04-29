@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { KeyRound, ShieldCheck } from "lucide-react";
 import { prisma } from "@lottery/db";
 import { SuccessSubmitButton } from "../../components/success-submit-button";
-import { hashPassword, hashVerificationCode } from "../../lib/password";
+import { hashPassword, hashVerificationCode, isEnglishPassword } from "../../lib/password";
 
 const db = prisma as any;
 
@@ -55,7 +55,7 @@ async function resetPasswordAction(formData: FormData) {
   const password = String(formData.get("password") ?? "");
   const tokenId = (await cookies()).get("password_reset_token_id")?.value;
 
-  if (!email || password.length < 8 || !tokenId) {
+  if (!email || !isEnglishPassword(password) || !tokenId) {
     redirect(`/reset-password?email=${encodeURIComponent(email)}&verified=1&error=missing`);
   }
 
@@ -134,7 +134,7 @@ export default async function ResetPasswordPage({
             <input name="email" type="hidden" value={email} />
             <label className="block">
               <span className="font-bold text-slate-200">סיסמה חדשה</span>
-              <input className="mt-2 h-12 w-full rounded-2xl border border-white/10 bg-white/10 px-4 text-white outline-none transition focus:border-cyan-300 focus:shadow-[0_0_0_4px_rgba(34,211,238,0.12)]" name="password" required minLength={8} type="password" />
+              <input className="mt-2 h-12 w-full rounded-2xl border border-white/10 bg-white/10 px-4 text-white outline-none transition focus:border-cyan-300 focus:shadow-[0_0_0_4px_rgba(34,211,238,0.12)]" name="password" required minLength={8} pattern="[A-Za-z0-9]+" title="סיסמה באנגלית ומספרים בלבד" type="password" />
             </label>
             <SuccessSubmitButton>עדכון סיסמה</SuccessSubmitButton>
           </form>

@@ -1,5 +1,6 @@
 import { EventEmitter } from "node:events";
 import type {
+  ContactCardMessage,
   ConnectionSnapshot,
   IncomingWhatsAppMessage,
   OutboundWhatsAppMessage,
@@ -16,8 +17,59 @@ function normalizeRecipient(phone: string): string {
   return phone.replace(/[^\d]/g, "");
 }
 
+function normalizePhone(phone: string): string {
+  const compact = phone.replace(/[^\d+]/g, "");
+
+  if (!compact) {
+    return "";
+  }
+
+  if (compact.startsWith("+")) {
+    return compact;
+  }
+
+  if (compact.startsWith("972")) {
+    return `+${compact}`;
+  }
+
+  if (compact.startsWith("0")) {
+    return `+972${compact.slice(1)}`;
+  }
+
+  return `+${compact}`;
+}
+
+function escapeVcard(value: string): string {
+  return value
+    .replace(/\\/g, "\\\\")
+    .replace(/\r?\n/g, "\\n")
+    .replace(/,/g, "\\,")
+    .replace(/;/g, "\\;");
+}
+
+function buildVcf(cards: ContactCardMessage[]): string {
+  return `${cards
+    .map((card) =>
+      [
+        "BEGIN:VCARD",
+        "VERSION:3.0",
+        `FN:${escapeVcard(card.displayName)}`,
+        card.organization ? `ORG:${escapeVcard(card.organization)}` : null,
+        `TEL;TYPE=CELL:${normalizePhone(card.phone)}`,
+        "END:VCARD"
+      ]
+        .filter(Boolean)
+        .join("\r\n")
+    )
+    .join("\r\n")}\r\n`;
+}
+
 function graphVersion(): string {
   return process.env.META_GRAPH_API_VERSION ?? "v20.0";
+}
+
+function envAccessToken(): string | null {
+  return process.env.WHATSAPP_ACCESS_TOKEN ?? process.env.META_WHATSAPP_ACCESS_TOKEN ?? null;
 }
 
 export class OfficialBusinessProvider implements WhatsAppProvider {
@@ -26,8 +78,8 @@ export class OfficialBusinessProvider implements WhatsAppProvider {
   private readonly emitter = new EventEmitter();
 
   async connect(config: ProviderConnectionConfig): Promise<void> {
-    const accessToken = config.officialAccessToken ?? process.env.META_WHATSAPP_ACCESS_TOKEN ?? null;
-    const phoneNumberId = config.officialPhoneNumberId ?? null;
+    const accessToken = config.officialAccessToken ?? envAccessToken();
+    const phoneNumberId = config.officialPhoneNumberId ?? process.env.WHATSAPP_PHONE_NUMBER_ID ?? null;
 
     if (!accessToken || !phoneNumberId) {
       const snapshot: ConnectionSnapshot = {
@@ -80,6 +132,11 @@ export class OfficialBusinessProvider implements WhatsAppProvider {
 
     if (!config) {
       throw new Error("Official WhatsApp Business connection is not configured.");
+    }
+
+    if (message.contactCards?.length) {
+      await this.sendContactsMessage(config, message);
+      return;
     }
 
     const endpoint = `https://graph.facebook.com/${graphVersion()}/${config.officialPhoneNumberId}/messages`;
@@ -163,5 +220,94 @@ export class OfficialBusinessProvider implements WhatsAppProvider {
         body: message.body
       }
     };
+  }
+
+  private buildContactsPayload(message: OutboundWhatsAppMessage) {
+    return {
+      messaging_product: "whatsapp",
+      to: normalizeRecipient(message.to),
+      type: "contacts",
+      contacts: (message.contactCards ?? []).map((card) => ({
+        name: {
+          formatted_name: card.displayName,
+          first_name: card.displayName
+        },
+        org: card.organization
+          ? {
+              company: card.organization
+            }
+          : undefined,
+        phones: [
+          {
+            phone: normalizePhone(card.phone),
+            type: "CELL"
+          }
+        ]
+      }))
+    };
+  }
+
+  private async uploadVcfDocument(
+    config: OfficialRuntimeConfig,
+    cards: ContactCardMessage[]
+  ): Promise<{ id: string; filename: string }> {
+    const filename = `magic-flow-contacts-${Date.now()}.vcf`;
+    const formData = new FormData();
+    formData.set("messaging_product", "whatsapp");
+    formData.set("file", new Blob([buildVcf(cards)], { type: "text/vcard" }), filename);
+
+    const response = await fetch(
+      `https://graph.facebook.com/${graphVersion()}/${config.officialPhoneNumberId}/media`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${config.officialAccessToken}`
+        },
+        body: formData
+      }
+    );
+
+    const payload = (await response.json().catch(() => null)) as { id?: string; error?: unknown } | null;
+
+    if (!response.ok || !payload?.id) {
+      throw new Error(`WhatsApp media upload failed: ${JSON.stringify(payload)}`);
+    }
+
+    return { id: payload.id, filename };
+  }
+
+  private async sendContactsMessage(
+    config: OfficialRuntimeConfig,
+    message: OutboundWhatsAppMessage
+  ): Promise<void> {
+    const endpoint = `https://graph.facebook.com/${graphVersion()}/${config.officialPhoneNumberId}/messages`;
+    const contactCards = message.contactCards ?? [];
+    const shouldSendVcf =
+      message.contactDeliveryMode === "VCARD_FILE" || contactCards.length > 2;
+    const body = shouldSendVcf
+      ? {
+          messaging_product: "whatsapp",
+          to: normalizeRecipient(message.to),
+          type: "document",
+          document: {
+            ...(await this.uploadVcfDocument(config, contactCards)),
+            caption: message.body || "קובץ אנשי קשר לשמירה"
+          }
+        }
+      : this.buildContactsPayload(message);
+
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${config.officialAccessToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(body)
+    });
+
+    if (!response.ok) {
+      const payload = await response.text();
+      throw new Error(`WhatsApp contacts send failed: ${payload}`);
+    }
   }
 }

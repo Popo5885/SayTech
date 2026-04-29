@@ -2,8 +2,15 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { ArrowLeft, Sparkles } from "lucide-react";
-import { isGoogleAuthConfigured, signIn } from "../../auth";
+import { prisma } from "@lottery/db";
+import { signIn } from "../../auth";
 import { SuccessSubmitButton } from "../../components/success-submit-button";
+import { getAuthFeatureSettings, isGoogleLoginEnabled, isWhatsAppLoginEnabled } from "../../lib/auth-settings";
+import { normalizeIsraeliPhone } from "../../lib/phone";
+import { createVerificationCode, hashVerificationCode } from "../../lib/password";
+import { sendWhatsAppText } from "../../lib/whatsapp";
+
+const db = prisma as any;
 
 async function loginAction(formData: FormData) {
   "use server";
@@ -30,23 +37,104 @@ async function loginAction(formData: FormData) {
 async function googleAction() {
   "use server";
 
-  if (!isGoogleAuthConfigured()) {
+  if (!(await isGoogleLoginEnabled())) {
     redirect("/login?error=google-config");
   }
 
-  await signIn("google", { redirectTo: "/admin" });
+  await signIn("google", { redirectTo: "/dashboard" });
+}
+
+async function requestWhatsAppCodeAction(formData: FormData) {
+  "use server";
+
+  const phone = normalizeIsraeliPhone(String(formData.get("phone") ?? ""));
+
+  if (!(await isWhatsAppLoginEnabled())) {
+    redirect("/login?error=wa-disabled");
+  }
+
+  if (!phone) {
+    redirect("/login?error=wa-phone");
+  }
+
+  const user = await db.user.findFirst({
+    where: {
+      phone,
+      accountStatus: "active"
+    }
+  });
+
+  if (!user) {
+    redirect(`/login?error=wa-user&phone=${encodeURIComponent(phone)}`);
+  }
+
+  const code = createVerificationCode();
+
+  const sent = await sendWhatsAppText({
+    to: phone,
+    body: `קוד הכניסה שלך ל-Magic Flow הוא ${code}. הקוד תקף ל-10 דקות.`
+  });
+
+  if (!sent) {
+    const settings = await getAuthFeatureSettings();
+
+    if (settings.whatsappManualCodeEnabled) {
+      redirect(`/login?wa=manual&phone=${encodeURIComponent(phone)}`);
+    }
+
+    redirect(`/login?error=wa-config&phone=${encodeURIComponent(phone)}`);
+  }
+
+  await db.whatsAppLoginCode.create({
+    data: {
+      phone,
+      codeHash: hashVerificationCode(code),
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000)
+    }
+  });
+
+  redirect(`/login?wa=sent&phone=${encodeURIComponent(phone)}`);
+}
+
+async function verifyWhatsAppCodeAction(formData: FormData) {
+  "use server";
+
+  const phone = normalizeIsraeliPhone(String(formData.get("phone") ?? ""));
+  const otpCode = String(formData.get("otpCode") ?? "").trim();
+
+  if (!(await isWhatsAppLoginEnabled())) {
+    redirect("/login?error=wa-disabled");
+  }
+
+  try {
+    await signIn("credentials", {
+      phone,
+      otpCode,
+      redirectTo: "/dashboard"
+    });
+  } catch (error) {
+    if (isRedirectError(error)) {
+      throw error;
+    }
+
+    redirect(`/login?error=wa-code&phone=${encodeURIComponent(phone ?? "")}&wa=sent`);
+  }
 }
 
 export default async function LoginPage({
   searchParams
 }: {
-  searchParams?: Promise<{ error?: string; email?: string }>;
+  searchParams?: Promise<{ error?: string; email?: string; phone?: string; wa?: string }>;
 }) {
   const params = await searchParams;
   const hasCredentialsError = params?.error === "credentials" || params?.error === "CredentialsSignin";
   const hasConfigError = params?.error === "Configuration" || params?.error === "google-config";
+  const whatsappError = params?.error?.startsWith("wa") ? params.error : null;
   const triedEmail = params?.email ?? "";
-  const googleReady = isGoogleAuthConfigured();
+  const triedPhone = params?.phone ?? "";
+  const authSettings = await getAuthFeatureSettings();
+  const googleReady = authSettings.googleLoginEnabled;
+  const whatsappReady = authSettings.whatsappLoginEnabled;
   const registerHref = triedEmail
     ? `/register?email=${encodeURIComponent(triedEmail)}`
     : "/register";
@@ -69,22 +157,22 @@ export default async function LoginPage({
           </Link>
           <h1 className="mt-16 text-4xl font-black leading-tight md:text-5xl">כניסה למערכת</h1>
           <p className="mt-5 text-lg leading-8 text-slate-300">
-            נכנסים ללוח עבודה ברור עם הפעולות החשובות: חיבור, הודעות והגרלה.
+            התחברות פשוטה ללקוחות Magic Flow. אם החשבון עדיין ממתין לאישור, נעביר אותך למסך המתנה מסודר.
           </p>
           <div className="mt-8 rounded-3xl border border-emerald-300/20 bg-emerald-300/10 p-5 text-sm font-semibold leading-7 text-emerald-100">
-            חשבון שממתין לאישור יעבור אוטומטית למסך המתנה מסודר.
+            אפשר להיכנס עם מייל וסיסמה, Google או קוד חד-פעמי ב-WhatsApp.
           </div>
         </section>
 
         <section className="border-beam-card rounded-[34px] border border-white/10 bg-white/[0.08] p-6 text-white shadow-2xl backdrop-blur-xl md:p-8">
           <h2 className="text-3xl font-black">טוב שחזרת</h2>
-          <p className="mt-2 text-slate-300">אפשר להתחבר עם מייל וסיסמה או עם Google.</p>
+          <p className="mt-2 text-slate-300">בחר דרך כניסה והמשך לדשבורד שלך.</p>
 
           {hasCredentialsError ? (
             <div className="mt-5 rounded-3xl border border-amber-300/25 bg-amber-300/12 p-4 text-sm font-semibold leading-7 text-amber-100">
-              <p>פרטים לא מזוהים. רוצה לפתוח חשבון חדש?</p>
+              <p>פרטי ההתחברות לא זוהו. אפשר לפתוח חשבון חדש או לאפס סיסמה.</p>
               <Link className="mt-3 inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-2 font-black text-slate-950 transition hover:-translate-y-0.5" href={registerHref}>
-                פתיחת חשבון עכשיו
+                פתיחת חשבון
                 <ArrowLeft className="h-4 w-4" />
               </Link>
             </div>
@@ -92,30 +180,32 @@ export default async function LoginPage({
 
           {hasConfigError ? (
             <div className="mt-5 rounded-3xl border border-red-300/25 bg-red-300/12 p-4 text-sm font-semibold leading-7 text-red-100">
-              יש בעיה בהגדרות ההתחברות של השרת. צריך לוודא שב-Railway מוגדרים `AUTH_SECRET`, `NEXTAUTH_URL`, ובשביל Google גם `GOOGLE_CLIENT_SECRET`.
+              Google Login עדיין לא פעיל. צריך להגדיר GOOGLE_CLIENT_SECRET ולהפעיל את הכניסה דרך ממשק הניהול.
+            </div>
+          ) : null}
+
+          {whatsappError ? (
+            <div className="mt-5 rounded-3xl border border-amber-300/25 bg-amber-300/12 p-4 text-sm font-semibold leading-7 text-amber-100">
+              {whatsappError === "wa-config"
+                ? "שליחת קוד WhatsApp לא זמינה כרגע. צריך להגדיר WHATSAPP_ACCESS_TOKEN ו-WHATSAPP_PHONE_NUMBER_ID."
+                : whatsappError === "wa-disabled"
+                  ? "כניסה עם WhatsApp כבויה כרגע בממשק הניהול."
+                : whatsappError === "wa-user"
+                  ? "לא נמצא חשבון פעיל עם מספר הטלפון הזה."
+                  : whatsappError === "wa-code"
+                    ? "הקוד שהוזן לא תקין או פג תוקף."
+                    : "צריך להזין מספר טלפון תקין."}
             </div>
           ) : null}
 
           <form action={loginAction} className="mt-6 space-y-4">
             <label className="block">
               <span className="font-bold text-slate-200">אימייל</span>
-              <input
-                className="mt-2 h-12 w-full rounded-2xl border border-white/10 bg-white/10 px-4 text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300 focus:shadow-[0_0_0_4px_rgba(34,211,238,0.12)]"
-                defaultValue={triedEmail}
-                dir="ltr"
-                name="email"
-                required
-                type="email"
-              />
+              <input className="mt-2 h-12 w-full rounded-2xl border border-white/10 bg-white/10 px-4 text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300 focus:shadow-[0_0_0_4px_rgba(34,211,238,0.12)]" defaultValue={triedEmail} dir="ltr" name="email" required type="email" />
             </label>
             <label className="block">
               <span className="font-bold text-slate-200">סיסמה</span>
-              <input
-                className="mt-2 h-12 w-full rounded-2xl border border-white/10 bg-white/10 px-4 text-white outline-none transition focus:border-cyan-300 focus:shadow-[0_0_0_4px_rgba(34,211,238,0.12)]"
-                name="password"
-                required
-                type="password"
-              />
+              <input className="mt-2 h-12 w-full rounded-2xl border border-white/10 bg-white/10 px-4 text-white outline-none transition focus:border-cyan-300 focus:shadow-[0_0_0_4px_rgba(34,211,238,0.12)]" name="password" required type="password" />
             </label>
             <div className="flex flex-wrap items-center gap-3">
               <SuccessSubmitButton>כניסה</SuccessSubmitButton>
@@ -137,9 +227,31 @@ export default async function LoginPage({
             </form>
           ) : (
             <div className="rounded-2xl border border-white/10 bg-white/10 p-4 text-sm font-semibold leading-7 text-slate-200">
-              התחברות Google תופעל לאחר הגדרת Google OAuth בסביבת השרת.
+              התחברות Google תופעל אחרי הגדרת GOOGLE_CLIENT_SECRET בסביבת השרת והפעלה בממשק הניהול.
             </div>
           )}
+
+          {whatsappReady ? (
+            <div className="mt-6 rounded-3xl border border-white/10 bg-white/[0.06] p-4">
+              <p className="font-black text-white">כניסה עם WhatsApp</p>
+              <form action={requestWhatsAppCodeAction} className="mt-3 flex flex-col gap-3 sm:flex-row">
+                <input className="h-11 flex-1 rounded-2xl border border-white/10 bg-white/10 px-4 text-left text-white outline-none focus:border-cyan-300" defaultValue={triedPhone} dir="ltr" name="phone" placeholder="0501234567" required />
+                <button className="h-11 rounded-2xl bg-cyan-300 px-5 text-sm font-black text-slate-950" type="submit">שלח קוד</button>
+              </form>
+              {params?.wa === "manual" ? (
+                <div className="mt-3 rounded-2xl border border-cyan-200/20 bg-cyan-200/10 p-3 text-sm font-semibold leading-6 text-cyan-50">
+                  אין כרגע שולח WhatsApp פעיל. אפשר להזין כאן קוד שהוגדר בממשק הניהול.
+                </div>
+              ) : null}
+              {params?.wa === "sent" || params?.wa === "manual" ? (
+                <form action={verifyWhatsAppCodeAction} className="mt-3 flex flex-col gap-3 sm:flex-row">
+                  <input name="phone" type="hidden" value={triedPhone} />
+                  <input className="h-11 flex-1 rounded-2xl border border-white/10 bg-white/10 px-4 text-center text-white outline-none focus:border-cyan-300" dir="ltr" inputMode="numeric" name="otpCode" placeholder="קוד בן 6 ספרות" required />
+                  <button className="h-11 rounded-2xl bg-emerald-400 px-5 text-sm font-black text-slate-950" type="submit">אמת והיכנס</button>
+                </form>
+              ) : null}
+            </div>
+          ) : null}
 
           <p className="mt-6 text-sm text-slate-300">
             עדיין אין חשבון? <Link className="font-bold text-cyan-200 hover:text-white" href="/register">הרשמה</Link>

@@ -77,6 +77,10 @@ function mapWorkspace(record: any): Workspace {
     contractSignedAt: record.contractSignedAt ? record.contractSignedAt.toISOString() : null,
     phoneNumber: record.phoneNumber,
     whatsappStatus: record.whatsappStatus,
+    contactBotBaseQuota: record.contactBotBaseQuota ?? 600,
+    contactBotExtraQuota: record.contactBotExtraQuota ?? 0,
+    contactBotUsedQuota: record.contactBotUsedQuota ?? 0,
+    contactBotMonthlyPriceCents: record.contactBotMonthlyPriceCents ?? 5000,
     numberPoolStatus: record.numberPoolStatus ?? "waiting",
     onboardingTourStep: record.onboardingTourStep ?? 0,
     onboardingTourCompletedAt: record.onboardingTourCompletedAt
@@ -187,6 +191,8 @@ function mapContactSyncLedger(record: any): ContactSyncLedgerEntry {
     displayName: record.displayName,
     googlePersonResourceName: record.googlePersonResourceName ?? null,
     lastCampaignId: record.lastCampaignId ?? null,
+    status: record.status ?? "saved_system",
+    quotaCounted: Boolean(record.quotaCounted),
     syncedAt: record.syncedAt ? record.syncedAt.toISOString() : null,
     lastCheckedAt: record.lastCheckedAt.toISOString()
   };
@@ -394,7 +400,7 @@ export class WorkspaceRepository {
         ? decryptSecret(workspace.googleRefreshTokenEncrypted)
         : null,
       tokenExpiry: workspace.googleTokenExpiry ?? null,
-      contactTemplate: workspace.googleContactTemplate ?? "{{name}} - Lottery"
+      contactTemplate: workspace.googleContactTemplate ?? "{{name}}+בוט"
     };
   }
 }
@@ -576,6 +582,8 @@ export class ContactSyncLedgerRepository {
     googlePersonResourceName?: string | null;
     lastCampaignId?: string | null;
     syncedAt?: Date | null;
+    status?: "saved_system" | "synced_google" | "duplicate" | "quota_exceeded" | "pending_google";
+    quotaCounted?: boolean;
     lastCheckedAt?: Date;
   }): Promise<ContactSyncLedgerEntry> {
     const entry = await db.contactSyncLedger.upsert({
@@ -589,6 +597,8 @@ export class ContactSyncLedgerRepository {
         displayName: input.displayName,
         googlePersonResourceName: input.googlePersonResourceName ?? null,
         lastCampaignId: input.lastCampaignId ?? null,
+        status: input.status ?? "saved_system",
+        quotaCounted: input.quotaCounted ?? false,
         syncedAt: input.syncedAt ?? null,
         lastCheckedAt: input.lastCheckedAt ?? new Date()
       },
@@ -598,6 +608,8 @@ export class ContactSyncLedgerRepository {
         displayName: input.displayName,
         googlePersonResourceName: input.googlePersonResourceName ?? null,
         lastCampaignId: input.lastCampaignId ?? null,
+        status: input.status ?? "saved_system",
+        quotaCounted: input.quotaCounted ?? false,
         syncedAt: input.syncedAt ?? null,
         lastCheckedAt: input.lastCheckedAt ?? new Date()
       }

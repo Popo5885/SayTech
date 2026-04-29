@@ -130,6 +130,21 @@ enum ContactLeadStatus {
   closed
 }
 
+enum ContactSyncStatus {
+  saved_system
+  synced_google
+  duplicate
+  quota_exceeded
+  pending_google
+}
+
+enum ContactBotUpgradeStatus {
+  open
+  approved
+  rejected
+  closed
+}
+
 enum EmailTemplateKind {
   PENDING_USER
   OWNER_APPROVAL
@@ -166,7 +181,11 @@ model Workspace {
   googleAccessTokenEncrypted  String?              @db.Text
   googleRefreshTokenEncrypted String?              @db.Text
   googleTokenExpiry           DateTime?
-  googleContactTemplate       String               @default("{{name}} - Lottery")
+  googleContactTemplate       String               @default("{{name}}+בוט")
+  contactBotBaseQuota         Int                  @default(600)
+  contactBotExtraQuota        Int                  @default(0)
+  contactBotUsedQuota         Int                  @default(0)
+  contactBotMonthlyPriceCents Int                  @default(5000)
   numberPoolStatus            WorkspaceNumberPoolStatus @default(waiting)
   onboardingTourStep          Int                  @default(0)
   onboardingTourCompletedAt   DateTime?
@@ -176,6 +195,8 @@ model Workspace {
   connectionAssignments       WorkspaceConnectionAssignment[]
   campaigns                   Campaign[]
   contactSyncLedger           ContactSyncLedger[]
+  contactBotQuotaAdjustments  ContactBotQuotaAdjustment[]
+  contactBotUpgradeRequests   ContactBotUpgradeRequest[]
   members                     WorkspaceMember[]
   invites                     WorkspaceInvite[]
   contactCards                WorkspaceContactCard[]
@@ -426,6 +447,8 @@ model ContactSyncLedger {
   displayName              String
   googlePersonResourceName String?
   lastCampaignId           String?
+  status                   ContactSyncStatus @default(saved_system)
+  quotaCounted             Boolean   @default(false)
   syncedAt                 DateTime?
   lastCheckedAt            DateTime  @default(now())
   createdAt                DateTime  @default(now())
@@ -435,6 +458,51 @@ model ContactSyncLedger {
   @@unique([workspaceId, phone])
   @@index([workspaceId])
   @@index([lastCampaignId])
+  @@index([workspaceId, status])
+}
+
+model ContactBotQuotaAdjustment {
+  id              String    @id @default(cuid())
+  workspaceId     String
+  amount          Int
+  priceCents      Int       @default(0)
+  note            String?   @db.Text
+  createdByUserId String?
+  createdAt       DateTime  @default(now())
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([createdAt])
+}
+
+model ContactBotUpgradeRequest {
+  id                  String                  @id @default(cuid())
+  workspaceId         String
+  requestedContacts   Int                     @default(100)
+  requestedPacks      Int                     @default(1)
+  estimatedPriceCents Int                     @default(500)
+  status              ContactBotUpgradeStatus @default(open)
+  note                String?                 @db.Text
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+  closedAt            DateTime?
+  workspace           Workspace               @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model WhatsAppLoginCode {
+  id        String   @id @default(cuid())
+  phone     String
+  codeHash  String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([phone])
+  @@index([expiresAt])
 }
 
 model ContactLead {

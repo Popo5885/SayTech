@@ -189,6 +189,7 @@ export async function provisionWorkspaceForUser(userId: string) {
         maxCampaigns: 1,
         phoneNumber: null,
         whatsappStatus: "DISCONNECTED",
+        googleContactTemplate: "{{name}}+בוט",
         numberPoolStatus: "waiting"
       }
     });

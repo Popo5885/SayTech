@@ -4,7 +4,9 @@ import Google from "next-auth/providers/google";
 import { createHash } from "node:crypto";
 import { WorkspaceRepository } from "@lottery/core";
 import { prisma } from "@lottery/db";
-import { verifyPassword } from "./lib/password";
+import { isGoogleOAuthConfigured, isWhatsAppLoginEnabled } from "./lib/auth-settings";
+import { normalizeIsraeliPhone } from "./lib/phone";
+import { hashPassword, hashVerificationCode, verifyPassword } from "./lib/password";
 
 const DEFAULT_GOOGLE_CLIENT_ID =
   "455116448878-mlsaq4mflpdm8fpkisnak26tjhmtduf3.apps.googleusercontent.com";
@@ -16,7 +18,7 @@ const db = prisma as any;
 const workspaceRepository = new WorkspaceRepository();
 
 export function isGoogleAuthConfigured() {
-  return Boolean(GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET);
+  return isGoogleOAuthConfigured();
 }
 
 function resolveAuthSecret() {
@@ -43,6 +45,32 @@ function resolveAuthSecret() {
   return "magic-flow-local-development-secret";
 }
 
+function initialAdminPasswordMatches(password: string) {
+  const initialPassword = process.env.SUPERADMIN_INITIAL_PASSWORD;
+
+  return Boolean(initialPassword && password === initialPassword);
+}
+
+async function createInitialAdminUser(email: string, password: string) {
+  const now = new Date();
+  const displayName = process.env.SUPERADMIN_NAME ?? "צוות Magic Flow";
+
+  return db.user.create({
+    data: {
+      email,
+      fullName: displayName,
+      name: displayName,
+      passwordHash: hashPassword(password),
+      accountStatus: "active",
+      globalRole: "SUPER_ADMIN",
+      acceptedTermsAt: now,
+      acceptedPrivacyAt: now,
+      approvedAt: now,
+      lastLoginAt: now
+    }
+  });
+}
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
   secret: resolveAuthSecret(),
@@ -58,23 +86,88 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       name: "כניסה עם מייל וסיסמה",
       credentials: {
         email: { label: "אימייל", type: "email" },
-        password: { label: "סיסמה", type: "password" }
+        password: { label: "סיסמה", type: "password" },
+        phone: { label: "טלפון", type: "text" },
+        otpCode: { label: "קוד WhatsApp", type: "text" }
       },
       async authorize(credentials) {
         const email = String(credentials?.email ?? "").trim().toLowerCase();
         const password = String(credentials?.password ?? "");
+        const phone = normalizeIsraeliPhone(String(credentials?.phone ?? ""));
+        const otpCode = String(credentials?.otpCode ?? "").trim();
+
+        if (phone && otpCode) {
+          if (!(await isWhatsAppLoginEnabled())) {
+            return null;
+          }
+
+          const token = await db.whatsAppLoginCode.findFirst({
+            where: {
+              phone,
+              codeHash: hashVerificationCode(otpCode),
+              usedAt: null,
+              expiresAt: {
+                gt: new Date()
+              }
+            },
+            orderBy: {
+              createdAt: "desc"
+            }
+          });
+          const user = token
+            ? await db.user.findFirst({
+                where: {
+                  phone,
+                  accountStatus: "active"
+                }
+              })
+            : null;
+
+          if (!token || !user) {
+            return null;
+          }
+
+          await Promise.all([
+            db.whatsAppLoginCode.update({
+              where: { id: token.id },
+              data: { usedAt: new Date() }
+            }),
+            db.user.update({
+              where: { id: user.id },
+              data: { lastLoginAt: new Date() }
+            })
+          ]);
+
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.fullName ?? user.name ?? user.email,
+            accountStatus: user.accountStatus,
+            globalRole: user.globalRole
+          } as any;
+        }
 
         if (!email || !password) {
           return null;
         }
 
-        const user = await db.user.findUnique({ where: { email } });
+        const isSystemAdmin = email === SYSTEM_ADMIN_EMAIL;
+        let user = await db.user.findUnique({ where: { email } });
 
-        if (!user || !verifyPassword(password, user.passwordHash)) {
-          return null;
+        if (!user && isSystemAdmin && initialAdminPasswordMatches(password)) {
+          user = await createInitialAdminUser(email, password);
         }
 
-        const isSystemAdmin = email === SYSTEM_ADMIN_EMAIL;
+        const passwordIsValid = user ? verifyPassword(password, user.passwordHash) : false;
+        const shouldRepairSystemAdmin =
+          Boolean(user) &&
+          isSystemAdmin &&
+          !passwordIsValid &&
+          initialAdminPasswordMatches(password);
+
+        if (!user || (!passwordIsValid && !shouldRepairSystemAdmin)) {
+          return null;
+        }
 
         const updatedUser = await db.user.update({
           where: { id: user.id },
@@ -82,6 +175,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             lastLoginAt: new Date(),
             ...(isSystemAdmin
               ? {
+                  ...(shouldRepairSystemAdmin ? { passwordHash: hashPassword(password) } : {}),
                   accountStatus: "active",
                   globalRole: "SUPER_ADMIN",
                   approvedAt: user.approvedAt ?? new Date()

@@ -16,6 +16,7 @@ import {
   type ParticipantStatusSnapshot
 } from "@lottery/core";
 import { auth } from "../auth";
+import { getContactBotQuota } from "./contact-bot";
 
 const baseUrl = process.env.PUBLIC_BASE_URL ?? "http://localhost:3000";
 const db = prisma as any;
@@ -531,12 +532,18 @@ export async function getContactsOverview() {
   }
 
   const entries = await contactSyncLedgerRepository.listByWorkspace(store.workspace.id);
+  const quota = await getContactBotQuota(store.workspace.id);
 
   return {
     workspace: store.workspace,
     campaign: store.campaign,
-    syncedContactsCount: entries.filter((entry) => Boolean(entry.syncedAt)).length,
+    entries,
+    syncedContactsCount: entries.filter((entry) => entry.status === "synced_google").length,
+    systemContactsCount: entries.filter((entry) => entry.status === "saved_system" || entry.status === "pending_google").length,
+    duplicateContactsCount: entries.filter((entry) => entry.status === "duplicate").length,
+    pendingContactsCount: entries.filter((entry) => entry.status === "quota_exceeded" || entry.status === "pending_google").length,
     checkedContactsCount: entries.length,
-    latestSync: entries[0]?.syncedAt ?? null
+    latestSync: entries[0]?.syncedAt ?? null,
+    quota
   };
 }

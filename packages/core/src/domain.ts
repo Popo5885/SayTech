@@ -73,6 +73,10 @@ export interface Workspace {
   contractSignedAt?: string | null;
   phoneNumber?: string | null;
   whatsappStatus?: "CONNECTED" | "DISCONNECTED";
+  contactBotBaseQuota?: number;
+  contactBotExtraQuota?: number;
+  contactBotUsedQuota?: number;
+  contactBotMonthlyPriceCents?: number;
   numberPoolStatus?: "waiting" | "assigned";
   onboardingTourStep?: number;
   onboardingTourCompletedAt?: string | null;
@@ -187,6 +191,12 @@ export interface MessageLogEntry {
   sentAt: string | null;
 }
 
+export interface ContactCardMessage {
+  displayName: string;
+  phone: string;
+  organization?: string | null;
+}
+
 export interface ContactSyncLedgerEntry {
   id: string;
   workspaceId: string;
@@ -194,6 +204,8 @@ export interface ContactSyncLedgerEntry {
   displayName: string;
   googlePersonResourceName: string | null;
   lastCampaignId: string | null;
+  status?: "saved_system" | "synced_google" | "duplicate" | "quota_exceeded" | "pending_google";
+  quotaCounted?: boolean;
   syncedAt: string | null;
   lastCheckedAt: string;
 }
@@ -276,6 +288,8 @@ export interface OutboundWhatsAppMessage {
   mediaUrl: string | null;
   mediaType: MediaType | null;
   interactive: TemplateInteractiveConfig | null;
+  contactCards?: ContactCardMessage[];
+  contactDeliveryMode?: "CONTACT_CARD" | "VCARD_FILE" | null;
 }
 
 export interface ConnectionSnapshot {

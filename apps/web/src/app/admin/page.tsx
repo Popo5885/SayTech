@@ -3,9 +3,10 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { encryptSecret } from "@lottery/core";
 import { prisma } from "@lottery/db";
-import { auth, isGoogleAuthConfigured } from "../../auth";
+import { auth } from "../../auth";
+import { AUTH_SETTING_KEYS, getAuthFeatureSettings, setAuthFeatureSetting } from "../../lib/auth-settings";
 import { ownerEmail, sendSystemEmail } from "../../lib/email";
-import { createVerificationCode, hashVerificationCode } from "../../lib/password";
+import { createVerificationCode, hashPassword, hashVerificationCode, isEnglishPassword } from "../../lib/password";
 import { normalizeIsraeliPhone } from "../../lib/phone";
 import { provisionWorkspaceForUser } from "../../lib/provisioning";
 
@@ -178,6 +179,81 @@ async function activateUserAction(formData: FormData) {
   });
   await provisionWorkspaceForUser(user.id);
   revalidatePath("/admin");
+}
+
+async function changeUserPasswordAction(formData: FormData) {
+  "use server";
+
+  const admin = await requireAdminUser();
+  const userId = String(formData.get("userId") ?? "");
+  const password = String(formData.get("password") ?? "");
+
+  if (!userId || !isEnglishPassword(password)) {
+    redirect("/admin?error=password#customers");
+  }
+
+  await db.user.update({
+    where: { id: userId },
+    data: { passwordHash: hashPassword(password) }
+  });
+  await db.adminAuditLog.create({
+    data: {
+      actorUserId: admin.id,
+      action: "SUPERADMIN_CHANGED_USER_PASSWORD",
+      targetType: "User",
+      targetId: userId
+    }
+  });
+  revalidatePath("/admin");
+  redirect("/admin?saved=password#customers");
+}
+
+async function adjustContactQuotaAction(formData: FormData) {
+  "use server";
+
+  const admin = await requireAdminUser();
+  const workspaceId = String(formData.get("workspaceId") ?? "");
+  const mode = String(formData.get("mode") ?? "packs");
+  const rawAmount = Math.max(1, Number(formData.get("amount") ?? 1));
+  const amount = mode === "contacts" ? rawAmount : rawAmount * 100;
+  const priceCents = mode === "contacts" ? 0 : rawAmount * 500;
+
+  if (!workspaceId || amount <= 0) {
+    redirect("/admin#customers");
+  }
+
+  await db.workspace.update({
+    where: { id: workspaceId },
+    data: {
+      contactBotExtraQuota: {
+        increment: amount
+      }
+    }
+  });
+  await db.contactBotQuotaAdjustment.create({
+    data: {
+      workspaceId,
+      amount,
+      priceCents,
+      note: mode === "contacts" ? "הגדלה ידנית מהממשק" : `תוספת ${rawAmount} חבילות`,
+      createdByUserId: admin.id
+    }
+  });
+  await db.contactBotUpgradeRequest.updateMany({
+    where: { workspaceId, status: "open" },
+    data: { status: "approved", closedAt: new Date() }
+  });
+  await db.adminAuditLog.create({
+    data: {
+      actorUserId: admin.id,
+      action: "CONTACT_BOT_QUOTA_ADJUSTED",
+      targetType: "Workspace",
+      targetId: workspaceId,
+      metadata: { amount, priceCents }
+    }
+  });
+  revalidatePath("/admin");
+  redirect("/admin?saved=quota#customers");
 }
 
 async function convertLeadAction(formData: FormData) {
@@ -414,6 +490,96 @@ async function saveSiteContentAction(formData: FormData) {
   revalidatePath("/");
 }
 
+async function saveAuthSettingsAction(formData: FormData) {
+  "use server";
+
+  const admin = await requireAdminUser();
+
+  await Promise.all([
+    setAuthFeatureSetting(
+      AUTH_SETTING_KEYS.googleLoginEnabled,
+      formData.get("googleLoginEnabled") === "on",
+      admin.id
+    ),
+    setAuthFeatureSetting(
+      AUTH_SETTING_KEYS.whatsappLoginEnabled,
+      formData.get("whatsappLoginEnabled") === "on",
+      admin.id
+    ),
+    setAuthFeatureSetting(
+      AUTH_SETTING_KEYS.whatsappManualCodeEnabled,
+      formData.get("whatsappManualCodeEnabled") === "on",
+      admin.id
+    )
+  ]);
+
+  await db.adminAuditLog.create({
+    data: {
+      actorUserId: admin.id,
+      action: "AUTH_SETTINGS_UPDATED",
+      targetType: "SiteSetting",
+      metadata: {
+        googleLoginEnabled: formData.get("googleLoginEnabled") === "on",
+        whatsappLoginEnabled: formData.get("whatsappLoginEnabled") === "on",
+        whatsappManualCodeEnabled: formData.get("whatsappManualCodeEnabled") === "on"
+      }
+    }
+  });
+  revalidatePath("/admin");
+  revalidatePath("/login");
+  revalidatePath("/register");
+  redirect("/admin?saved=auth#auth-settings");
+}
+
+async function setManualWhatsAppLoginCodeAction(formData: FormData) {
+  "use server";
+
+  const admin = await requireAdminUser();
+  const phone = normalizeIsraeliPhone(String(formData.get("phone") ?? ""));
+  const code = String(formData.get("code") ?? "").trim();
+  const expiresMinutes = Math.max(5, Math.min(120, Number(formData.get("expiresMinutes") ?? 30)));
+
+  if (!phone || !/^\d{4,8}$/.test(code)) {
+    redirect("/admin?error=wa-code#auth-settings");
+  }
+
+  const user = await db.user.findFirst({
+    where: {
+      phone,
+      accountStatus: "active"
+    },
+    select: {
+      id: true
+    }
+  });
+
+  if (!user) {
+    redirect("/admin?error=wa-login-user#auth-settings");
+  }
+
+  await db.whatsAppLoginCode.create({
+    data: {
+      phone,
+      codeHash: hashVerificationCode(code),
+      expiresAt: new Date(Date.now() + expiresMinutes * 60 * 1000)
+    }
+  });
+  await db.adminAuditLog.create({
+    data: {
+      actorUserId: admin.id,
+      action: "MANUAL_WHATSAPP_LOGIN_CODE_SET",
+      targetType: "User",
+      targetId: user.id,
+      metadata: {
+        phone,
+        expiresMinutes
+      }
+    }
+  });
+  revalidatePath("/admin");
+  redirect("/admin?saved=wa-code#auth-settings");
+}
+
 function Field({
   children,
   label
@@ -470,7 +636,8 @@ export default async function AdminPage({
     automationRules,
     broadcasts,
     billingRecords,
-    siteSettings
+    siteSettings,
+    upgradeRequests
   ] = await Promise.all([
     db.user.findMany({ where: { accountStatus: "pending" }, orderBy: { createdAt: "desc" } }),
     db.contactLead.findMany({ where: { status: "open" }, orderBy: { createdAt: "desc" } }),
@@ -481,7 +648,8 @@ export default async function AdminPage({
     db.automationRule.findMany({ orderBy: { createdAt: "desc" }, take: 20, include: { workspace: true } }),
     db.emailBroadcast.findMany({ orderBy: { createdAt: "desc" }, take: 10 }),
     db.billingRecord.findMany({ orderBy: { createdAt: "desc" }, take: 20, include: { workspace: true } }),
-    db.siteSetting.findMany()
+    db.siteSetting.findMany(),
+    db.contactBotUpgradeRequest.findMany({ where: { status: "open" }, orderBy: { createdAt: "desc" }, take: 50, include: { workspace: true } })
   ]);
   const workspaceByEmail = new Map<string, any>(
     workspaces
@@ -491,6 +659,7 @@ export default async function AdminPage({
   const siteContent = new Map<string, string>(
     siteSettings.map((setting: any) => [setting.key, String(setting.value)] as [string, string])
   );
+  const authSettings = await getAuthFeatureSettings();
   const operationalChecks = [
     {
       label: "Auth",
@@ -500,9 +669,25 @@ export default async function AdminPage({
     },
     {
       label: "Google Login",
-      value: isGoogleAuthConfigured() ? "פעיל" : "חסר Client Secret",
-      ok: isGoogleAuthConfigured(),
-      note: "נדרש GOOGLE_CLIENT_SECRET כדי לאפשר כניסה והרשמה עם Google."
+      value: authSettings.googleLoginEnabled
+        ? "פעיל"
+        : authSettings.googleConfigured
+          ? "מוגדר וכבוי"
+          : "חסר Client Secret",
+      ok: authSettings.googleLoginEnabled,
+      note: "נדרש GOOGLE_CLIENT_SECRET וגם הפעלה בממשק הניהול כדי לאפשר כניסה והרשמה עם Google."
+    },
+    {
+      label: "WhatsApp Login",
+      value: authSettings.whatsappLoginEnabled
+        ? authSettings.whatsappSenderConfigured
+          ? "פעיל ושולח"
+          : authSettings.whatsappManualCodeEnabled
+            ? "פעיל ידני"
+            : "פעיל ללא שולח"
+        : "כבוי",
+      ok: authSettings.whatsappLoginEnabled,
+      note: "אפשר לכבות בכל רגע. שליחת קוד דורשת WhatsApp Official או קוד ידני מהממשק."
     },
     {
       label: "SMTP",
@@ -536,6 +721,7 @@ export default async function AdminPage({
               {[
                 ["לקוחות", "#customers", "אישור, השהיה וכניסה לממשק לקוח"],
                 ["חיבורי WhatsApp", "#connections", "הוספת Official או כלי צוות"],
+                ["כניסות", "#auth-settings", "Google ו-WhatsApp OTP"],
                 ["אוטומציות", "#automations", "שליחה בזמן קבוע או אחרי הצטרפות"],
                 ["קבלות", "#billing", "תשלומים, קבלות ותוספים"]
               ].map(([title, href, description]) => (
@@ -586,6 +772,42 @@ export default async function AdminPage({
           </div>
         ) : null}
 
+        {params?.error === "password" ? (
+          <div className="rounded-[28px] border border-red-200 bg-red-50 p-5 text-sm font-bold leading-7 text-red-800">
+            הסיסמה חייבת להיות באנגלית בלבד: אותיות באנגלית ומספרים, לפחות 8 תווים.
+          </div>
+        ) : null}
+
+        {params?.saved === "password" ? (
+          <div className="rounded-[28px] border border-emerald-200 bg-emerald-50 p-5 text-sm font-bold leading-7 text-emerald-900">
+            הסיסמה עודכנה בהצלחה.
+          </div>
+        ) : null}
+
+        {params?.saved === "auth" ? (
+          <div className="rounded-[28px] border border-emerald-200 bg-emerald-50 p-5 text-sm font-bold leading-7 text-emerald-900">
+            הגדרות הכניסה נשמרו בהצלחה.
+          </div>
+        ) : null}
+
+        {params?.saved === "wa-code" ? (
+          <div className="rounded-[28px] border border-emerald-200 bg-emerald-50 p-5 text-sm font-bold leading-7 text-emerald-900">
+            קוד הכניסה ב-WhatsApp נשמר למספר שבחרת.
+          </div>
+        ) : null}
+
+        {params?.error === "wa-code" ? (
+          <div className="rounded-[28px] border border-red-200 bg-red-50 p-5 text-sm font-bold leading-7 text-red-800">
+            צריך להזין מספר טלפון תקין וקוד בן 4-8 ספרות.
+          </div>
+        ) : null}
+
+        {params?.error === "wa-login-user" ? (
+          <div className="rounded-[28px] border border-red-200 bg-red-50 p-5 text-sm font-bold leading-7 text-red-800">
+            לא נמצא משתמש פעיל עם מספר הטלפון הזה. עדכן את מספר המשתמש או אשר את החשבון לפני יצירת קוד.
+          </div>
+        ) : null}
+
         <section className="grid gap-4 md:grid-cols-4">
           <div className="rounded-[28px] bg-white p-6 shadow-sm">
             <p className="text-sm font-bold text-slate-500">ממתינים לאישור</p>
@@ -602,6 +824,83 @@ export default async function AdminPage({
           <div className="rounded-[28px] bg-white p-6 shadow-sm">
             <p className="text-sm font-bold text-slate-500">חיבורי WhatsApp</p>
             <p className="mt-3 text-4xl font-black">{connections.length}</p>
+          </div>
+        </section>
+
+        <section className="grid gap-6 xl:grid-cols-2" id="auth-settings">
+          <div className="rounded-[32px] bg-white p-6 shadow-sm">
+            <h2 className="text-2xl font-black text-slate-950">הגדרות כניסה</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+              כאן מפעילים או מכבים כניסה עם Google ו-WhatsApp. Google יופיע ללקוחות רק אם קיים GOOGLE_CLIENT_SECRET בסביבת השרת.
+            </p>
+            <form action={saveAuthSettingsAction} className="mt-5 space-y-3">
+              <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-bold text-slate-800">
+                <input
+                  className="mt-1"
+                  defaultChecked={authSettings.googleLoginAdminEnabled}
+                  name="googleLoginEnabled"
+                  type="checkbox"
+                />
+                <span>
+                  הפעל כניסה והרשמה עם Google
+                  <span className="mt-1 block text-xs font-semibold text-slate-500">
+                    סטטוס סביבה: {authSettings.googleConfigured ? "GOOGLE_CLIENT_SECRET מוגדר" : "חסר GOOGLE_CLIENT_SECRET"}
+                  </span>
+                </span>
+              </label>
+              <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-bold text-slate-800">
+                <input
+                  className="mt-1"
+                  defaultChecked={authSettings.whatsappLoginEnabled}
+                  name="whatsappLoginEnabled"
+                  type="checkbox"
+                />
+                <span>
+                  הפעל כניסה עם קוד WhatsApp
+                  <span className="mt-1 block text-xs font-semibold text-slate-500">
+                    שולח קודים: {authSettings.whatsappSenderConfigured ? "מוגדר" : "לא מוגדר"}
+                  </span>
+                </span>
+              </label>
+              <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-bold text-slate-800">
+                <input
+                  className="mt-1"
+                  defaultChecked={authSettings.whatsappManualCodeEnabled}
+                  name="whatsappManualCodeEnabled"
+                  type="checkbox"
+                />
+                <span>
+                  אפשר קוד WhatsApp ידני מהממשק
+                  <span className="mt-1 block text-xs font-semibold text-slate-500">
+                    שימושי לפני שמחברים שולח WhatsApp Official.
+                  </span>
+                </span>
+              </label>
+              <button className="h-11 rounded-2xl bg-slate-950 px-5 font-black text-white" type="submit">
+                שמור הגדרות כניסה
+              </button>
+            </form>
+          </div>
+
+          <div className="rounded-[32px] bg-white p-6 shadow-sm">
+            <h2 className="text-2xl font-black text-slate-950">קוד WhatsApp ידני</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+              אם אין עדיין שליחת WhatsApp פעילה, אפשר להגדיר קוד זמני למשתמש פעיל לפי מספר הטלפון שלו.
+            </p>
+            <form action={setManualWhatsAppLoginCodeAction} className="mt-5 grid gap-3 md:grid-cols-3">
+              <Field label="מספר טלפון">
+                <input className={inputClass()} defaultValue="+972542466340" dir="ltr" name="phone" required />
+              </Field>
+              <Field label="קוד">
+                <input className={inputClass()} dir="ltr" inputMode="numeric" maxLength={8} minLength={4} name="code" placeholder="123456" required />
+              </Field>
+              <Field label="תוקף בדקות">
+                <input className={inputClass()} defaultValue="30" max="120" min="5" name="expiresMinutes" type="number" />
+              </Field>
+              <button className="h-11 rounded-2xl bg-emerald-600 px-5 font-black text-white md:col-span-3" type="submit">
+                שמור קוד למשתמש
+              </button>
+            </form>
           </div>
         </section>
 
@@ -661,6 +960,35 @@ export default async function AdminPage({
                           <button className="h-10 rounded-2xl bg-emerald-600 px-4 text-sm font-black text-white" type="submit">הפעל</button>
                         </form>
                       )}
+                      <form action={changeUserPasswordAction} className="flex flex-wrap items-center gap-2">
+                        <input name="userId" type="hidden" value={user.id} />
+                        <input
+                          className="h-10 w-36 rounded-2xl border border-slate-200 px-3 text-left text-sm outline-none focus:border-blue-400"
+                          dir="ltr"
+                          minLength={8}
+                          name="password"
+                          pattern="[A-Za-z0-9]+"
+                          placeholder="NewPass123"
+                          required
+                          title="סיסמה באנגלית ומספרים בלבד"
+                          type="password"
+                        />
+                        <button className="h-10 rounded-2xl border border-slate-200 px-4 text-sm font-black text-slate-700" type="submit">עדכן סיסמה</button>
+                      </form>
+                      {workspace ? (
+                        <form action={adjustContactQuotaAction} className="flex flex-wrap items-center gap-2 rounded-2xl bg-violet-50 p-2">
+                          <input name="workspaceId" type="hidden" value={workspace.id} />
+                          <select className="h-10 rounded-2xl border border-violet-200 bg-white px-3 text-sm" name="mode">
+                            <option value="packs">חבילות של 100</option>
+                            <option value="contacts">מספר אנשי קשר</option>
+                          </select>
+                          <input className="h-10 w-24 rounded-2xl border border-violet-200 px-3 text-center text-sm outline-none focus:border-violet-400" defaultValue="1" min="1" name="amount" type="number" />
+                          <button className="h-10 rounded-2xl bg-violet-600 px-4 text-sm font-black text-white" type="submit">הגדל מכסה</button>
+                          <span className="text-xs font-bold text-violet-900">
+                            {workspace.contactBotUsedQuota ?? 0}/{(workspace.contactBotBaseQuota ?? 600) + (workspace.contactBotExtraQuota ?? 0)}
+                          </span>
+                        </form>
+                      ) : null}
                     </div>
                   </div>
                 );
@@ -668,6 +996,30 @@ export default async function AdminPage({
             </div>
           </div>
         </section>
+
+        {upgradeRequests.length > 0 ? (
+          <section className="rounded-[32px] bg-white p-6 shadow-sm">
+            <h2 className="text-2xl font-black text-slate-950">בקשות שדרוג מכסת אנשי קשר</h2>
+            <div className="mt-5 grid gap-3 md:grid-cols-2">
+              {upgradeRequests.map((request: any) => (
+                <div className="rounded-2xl border border-violet-100 bg-violet-50 p-4" key={request.id}>
+                  <p className="font-black text-violet-950">{request.workspace?.name ?? "לקוח"}</p>
+                  <p className="mt-1 text-sm text-violet-900">
+                    {request.requestedContacts} אנשי קשר נוספים · {(request.estimatedPriceCents / 100).toLocaleString("he-IL")} ₪
+                  </p>
+                  <form action={adjustContactQuotaAction} className="mt-3 flex flex-wrap items-center gap-2">
+                    <input name="workspaceId" type="hidden" value={request.workspaceId} />
+                    <input name="mode" type="hidden" value="contacts" />
+                    <input name="amount" type="hidden" value={request.requestedContacts} />
+                    <button className="h-10 rounded-2xl bg-violet-600 px-4 text-sm font-black text-white" type="submit">
+                      אשר והגדל
+                    </button>
+                  </form>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
 
         <section className="grid gap-6 xl:grid-cols-3">
           <div className="rounded-[32px] bg-white p-6 shadow-sm" id="automations">

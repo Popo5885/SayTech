@@ -42,18 +42,18 @@ async function getLandingContent() {
 
 const flowCards = [
   {
-    title: "חיבור",
-    description: "מספר WhatsApp מוקצה מהמאגר ומוצג ללקוח כסטטוס ברור, בלי מסכים טכניים מיותרים.",
+    title: "חיבור פשוט",
+    description: "הלקוח רואה סטטוס ברור ומוכן לעבודה, בלי מסכים טכניים ובלי חשיפה לכלי ניהול פנימיים.",
     icon: Zap
   },
   {
-    title: "הודעות",
-    description: "עורך בעברית לבניית תסריט השיחה, משתנים חכמים, מדיה ותצוגה מקדימה לפני הפעלה.",
+    title: "שמירת אנשי קשר",
+    description: "הבוט שומר אנשי קשר בפורמט קבוע, בודק כפילויות, ומאפשר הורדה או שליחה למייל.",
     icon: MessageCircle
   },
   {
     title: "הגרלה",
-    description: "ניהול משתתפים אמיתיים בלבד, בחירת זוכה שקופה ותיעוד מסודר של כל פעולה.",
+    description: "מסלול הגרלות מקצועי עם משתתפים אמיתיים, בחירת זוכה ותיעוד מסודר.",
     icon: Trophy
   }
 ];
@@ -61,50 +61,50 @@ const flowCards = [
 const capabilityCards = [
   {
     title: "קישור הצטרפות חכם",
-    description: "המשתתף מגיע ישירות ל-WhatsApp עם הודעת פתיחה מוכנה וזיהוי מפנה מובנה.",
+    description: "המשתתף מגיע ישירות ל-WhatsApp עם הודעת פתיחה מוכנה וזיהוי מקור מסודר.",
     icon: MousePointer2
   },
   {
     title: "אנשי קשר שעובדים",
-    description: "מספרים נשמרים בפורמט בינלאומי, עם יצוא vCard וסנכרון Google Contacts.",
+    description: "מספרים נשמרים בפורמט בינלאומי, עם ייצוא VCF וסנכרון Google Contacts כשמחברים חשבון.",
     icon: ContactRound
   },
   {
-    title: "בקרה לפני כניסה",
-    description: "כל לקוח חדש עובר בדיקה של צוות Magic Flow לפני פתיחת סביבת העבודה.",
+    title: "אישור חשבון מסודר",
+    description: "אחרי הרשמה תראה אם החשבון ממתין לאישור. לאחר אישור אפשר להתחיל לעבוד.",
     icon: ShieldCheck
   },
   {
-    title: "אמת בזמן אמת",
-    description: "אין מספרים מומצאים, אין טבלאות דמו, ואין נתונים שלא הגיעו מהמערכת.",
+    title: "נתונים בזמן אמת",
+    description: "כל שמירה, בדיקה וייצוא מופיעים בדשבורד ברור, בלי טבלאות ידניות ובלי ניחושים.",
     icon: CheckCircle2
   }
 ];
 
 const controlCards = [
   {
-    title: "ניהול לקוחות",
-    description: "אישור, השהיה, פתיחת לקוח, כניסה לממשק לקוח וניהול סביבת עבודה ממקום אחד.",
+    title: "מכסה ברורה",
+    description: "600 אנשי קשר כלולים במסלול הבסיסי, עם מד שימוש פשוט וכפתור שדרוג כשהעסק גדל.",
     icon: Crown
   },
   {
-    title: "אוטומציות ומיילים",
-    description: "יצירת ניוזלטרים, עדכונים מתוזמנים, הודעות לאחר הצטרפות ותבניות מייל מסודרות.",
+    title: "גיבוי מערכת",
+    description: "אם Google Contacts לא מחובר, אנשי הקשר נשמרים במערכת וניתנים להורדה כקובץ VCF.",
     icon: BarChart3
   },
   {
-    title: "אבטחה והרשאות",
-    description: "גישה למנהל בלבד, הצפנת טוקנים, הפרדת Workspaces ותיעוד פעולות ניהול.",
+    title: "פרטיות ושקט",
+    description: "הלקוח רואה רק את המוצר שלו ואת הנתונים שלו. כל פעולה פנימית נשארת מאחורי הקלעים.",
     icon: LockKeyhole
   }
 ];
 
 const steps = [
   "נרשמים ומשלימים פרטים",
-  "צוות Magic Flow מאשר את החשבון",
-  "המערכת מקצה חיבור WhatsApp",
-  "עורכים הודעות וקישור הצטרפות",
-  "מריצים הגרלה עם נתונים אמיתיים"
+  "ממתינים לאישור חשבון",
+  "מחברים Google Contacts אם רוצים סנכרון אוטומטי",
+  "הבוט שומר אנשי קשר ומונע כפילויות",
+  "מורידים VCF או מבקשים שדרוג מכסה"
 ];
 
 export default async function LandingPage() {
@@ -126,13 +126,19 @@ export default async function LandingPage() {
       price: landingPrice,
       badge: "המסלול המרכזי",
       featured: true,
-      features: ["עד 3 קמפיינים", "עד 2,500 משתתפים", "אוטומציות", "Google Contacts", "הנחה על מבצעי בזק"]
+      features: ["קמפיין אחד פעיל", "עד 2,500 משתתפים", "Google Contacts", "עורך הודעות", "תמיכה מסודרת"]
     },
     {
-      name: "Enterprise",
-      price: "דברו איתנו",
+      name: "Unlimited",
+      price: "1,500 ₪",
       badge: "לצוותים וצמיחה",
-      features: ["קמפיינים ללא הגבלה", "ניהול מתקדם", "חיבורים מרובים", "דוחות ותיעוד", "ליווי צוות Magic Flow"]
+      features: ["קמפיין אחד פעיל", "ללא הגבלת משתתפים", "דוחות VCF", "ניהול מתקדם", "ליווי צמוד"]
+    },
+    {
+      name: "Contact Bot",
+      price: "50 ₪",
+      badge: "שמירת אנשי קשר",
+      features: ["600 אנשי קשר בחבילה", "כל 100 נוספים ב-5 ₪", "ייצוא VCF", "שליחה למייל", "Google Contacts"]
     }
   ];
 
@@ -274,10 +280,10 @@ export default async function LandingPage() {
           <div>
             <p className="text-sm font-black text-emerald-200">יכולות שמייצרות תוצאה</p>
             <h2 className="mt-3 text-3xl font-black leading-tight md:text-5xl">
-              חוויית לקוח ברורה, ותשתית ניהול שעובדת מאחורי הקלעים
+              חוויית לקוח ברורה, פשוטה ומקצועית
             </h2>
             <p className="mt-5 text-lg leading-8 text-slate-300">
-              המערכת נבנתה לבעלי עסקים שלא רוצים להתעסק בטכנולוגיה. הלקוח רואה פעולות ברורות; צוות הניהול מקבל שליטה מלאה.
+              המערכת נבנתה לבעלי עסקים שלא רוצים להתעסק בטכנולוגיה. הלקוח רואה רק את הפעולות החשובות לו: שמירה, מכסה, ייצוא ושדרוג.
             </p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -319,8 +325,8 @@ export default async function LandingPage() {
 
       <section className="relative z-10 mx-auto max-w-7xl px-5 py-20 lg:px-8">
         <div className="mb-10">
-          <p className="text-sm font-black text-cyan-200">לצוות הניהול</p>
-          <h2 className="mt-3 text-3xl font-black md:text-5xl">שליטה רחבה בלי לסבך את הלקוח</h2>
+          <p className="text-sm font-black text-cyan-200">לבעלי עסקים</p>
+          <h2 className="mt-3 text-3xl font-black md:text-5xl">שמירה, מכסה ושדרוג בלי סיבוך</h2>
         </div>
         <div className="grid gap-4 md:grid-cols-3">
           {controlCards.map((card) => {
@@ -341,10 +347,10 @@ export default async function LandingPage() {
           <p className="text-sm font-black text-cyan-200">מחירון פרימיום</p>
           <h2 className="mt-3 text-3xl font-black md:text-5xl">בחרו מסלול שמתאים לקצב הצמיחה</h2>
           <p className="mx-auto mt-4 max-w-2xl text-lg leading-8 text-slate-300">
-            כל המסלולים נשענים על אותו עיקרון: ממשק עברי, נתונים אמיתיים, וניהול WhatsApp מסודר.
+            כל המחירים כוללים מע״מ. הממשק בעברית, הנתונים אמיתיים, וחוויית WhatsApp מסודרת.
           </p>
         </div>
-        <div className="grid gap-5 lg:grid-cols-3">
+        <div className="grid gap-5 lg:grid-cols-4">
           {pricingTiers.map((tier) => (
             <article
               className={`tilt-card group ${tier.featured ? "border-beam-card scale-[1.02] border-cyan-200/40" : "border-white/10"} rounded-[2.25rem] border bg-white/[0.06] p-6 shadow-2xl backdrop-blur-xl transition duration-300 hover:-translate-y-2`}
@@ -360,7 +366,7 @@ export default async function LandingPage() {
               </div>
               <h3 className="mt-6 text-3xl font-black">{tier.name}</h3>
               <div className="mt-4 text-5xl font-black">{tier.price}</div>
-              <p className="mt-2 text-sm font-semibold text-slate-400">לחודש, כולל סביבת עבודה בעברית ותמיכה של צוות Magic Flow.</p>
+              <p className="mt-2 text-sm font-semibold text-slate-400">לחודש, המחיר כולל מע״מ ותמיכה של Magic Flow.</p>
               <ul className="mt-7 space-y-3 text-right">
                 {tier.features.map((feature) => (
                   <li className="flex items-start gap-3 text-sm font-bold leading-6 text-slate-200" key={feature}>

@@ -1,6 +1,11 @@
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 
 const KEY_LENGTH = 64;
+const ENGLISH_PASSWORD_PATTERN = /^[a-zA-Z0-9]+$/;
+
+export function isEnglishPassword(password: string): boolean {
+  return password.length >= 8 && ENGLISH_PASSWORD_PATTERN.test(password);
+}
 
 export function hashPassword(password: string): string {
   const salt = randomBytes(16).toString("hex");

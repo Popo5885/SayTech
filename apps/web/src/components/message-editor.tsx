@@ -132,6 +132,7 @@ export function MessageEditor({
   const [activeTemplateId, setActiveTemplateId] = useState(initialTemplates[0]?.id ?? "");
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
   const [uploadingTemplateId, setUploadingTemplateId] = useState<string | null>(null);
+  const [isDraggingMedia, setIsDraggingMedia] = useState(false);
   const [aiPrompt, setAiPrompt] = useState("");
   const [isPending, startSaveTransition] = useTransition();
 
@@ -444,13 +445,26 @@ export function MessageEditor({
                 </div>
               ) : null}
 
-              <div className="rounded-3xl border border-stone-200 bg-white p-4" data-tour="status-task">
+              <div
+                className={`rounded-3xl border border-stone-200 bg-white p-4 ${isDraggingMedia ? "ring-4 ring-cyan-100" : ""}`}
+                data-tour="status-task"
+                onDragLeave={() => setIsDraggingMedia(false)}
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  setIsDraggingMedia(true);
+                }}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  setIsDraggingMedia(false);
+                  void uploadMedia(activeTemplate.id, event.dataTransfer.files?.[0] ?? null);
+                }}
+              >
                 <p className="text-sm font-black text-stone-900">מדיה להודעה</p>
                 <p className="mt-1 text-sm leading-6 text-stone-500">
                   מעלים תמונה או וידאו מהמחשב או מהטלפון. אין צורך להדביק קישור.
                 </p>
 
-                <div className="mt-4 flex flex-wrap items-center gap-3">
+                <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-dashed border-stone-300 bg-stone-50 p-4">
                   <label className="inline-flex h-11 cursor-pointer items-center rounded-2xl bg-stone-950 px-4 text-sm font-black text-white transition hover:bg-stone-800">
                     {uploadingTemplateId === activeTemplate.id ? "מעלה..." : "בחירת קובץ"}
                     <input

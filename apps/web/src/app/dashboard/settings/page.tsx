@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@lottery/db";
 import { auth } from "../../../auth";
 import { SuccessSubmitButton } from "../../../components/success-submit-button";
+import { getPrimaryStore } from "../../../lib/live-store";
 import { normalizeIsraeliPhone } from "../../../lib/phone";
 
 const db = prisma as any;
@@ -40,6 +41,65 @@ async function updateProfileAction(formData: FormData) {
   redirect("/dashboard/settings?saved=1");
 }
 
+async function addContactCardAction(formData: FormData) {
+  "use server";
+
+  const store = await getPrimaryStore();
+
+  if (!store) {
+    redirect("/dashboard/settings?error=workspace");
+  }
+
+  const displayName = String(formData.get("displayName") ?? "").trim();
+  const phone = normalizeIsraeliPhone(String(formData.get("phone") ?? ""));
+  const organization = String(formData.get("organization") ?? "").trim();
+
+  if (!displayName || !phone) {
+    redirect("/dashboard/settings?error=contact-card");
+  }
+
+  const sortOrder = await db.workspaceContactCard.count({
+    where: {
+      workspaceId: store.workspace.id
+    }
+  });
+
+  await db.workspaceContactCard.create({
+    data: {
+      workspaceId: store.workspace.id,
+      displayName,
+      phone,
+      organization: organization || null,
+      sortOrder
+    }
+  });
+
+  revalidatePath("/dashboard/settings");
+  redirect("/dashboard/settings?saved=contact-card");
+}
+
+async function deleteContactCardAction(formData: FormData) {
+  "use server";
+
+  const store = await getPrimaryStore();
+
+  if (!store) {
+    redirect("/dashboard/settings?error=workspace");
+  }
+
+  const cardId = String(formData.get("cardId") ?? "");
+
+  await db.workspaceContactCard.deleteMany({
+    where: {
+      id: cardId,
+      workspaceId: store.workspace.id
+    }
+  });
+
+  revalidatePath("/dashboard/settings");
+  redirect("/dashboard/settings?saved=contact-card");
+}
+
 export default async function SettingsPage({
   searchParams
 }: {
@@ -54,6 +114,22 @@ export default async function SettingsPage({
 
   const params = await searchParams;
   const user = await db.user.findUnique({ where: { id: userId } });
+  const store = await getPrimaryStore();
+  const contactCards = store
+    ? await db.workspaceContactCard.findMany({
+        where: {
+          workspaceId: store.workspace.id
+        },
+        orderBy: [
+          {
+            sortOrder: "asc"
+          },
+          {
+            createdAt: "asc"
+          }
+        ]
+      })
+    : [];
 
   return (
     <main className="space-y-6" dir="rtl">
@@ -69,9 +145,24 @@ export default async function SettingsPage({
             ההגדרות נשמרו בהצלחה.
           </div>
         ) : null}
+        {params?.saved === "contact-card" ? (
+          <div className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-900">
+            כרטיס איש הקשר נשמר בהצלחה.
+          </div>
+        ) : null}
         {params?.error === "missing" ? (
           <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-800">
             צריך למלא שם וטלפון תקין.
+          </div>
+        ) : null}
+        {params?.error === "contact-card" ? (
+          <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-800">
+            צריך להזין שם ומספר טלפון תקין לכרטיס איש הקשר.
+          </div>
+        ) : null}
+        {params?.error === "workspace" ? (
+          <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-800">
+            עדיין אין סביבת עבודה פעילה לחשבון הזה.
           </div>
         ) : null}
 
@@ -109,6 +200,73 @@ export default async function SettingsPage({
             <SuccessSubmitButton>שמירת הגדרות</SuccessSubmitButton>
           </div>
         </form>
+      </section>
+
+      <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
+        <p className="text-sm font-black text-cyan-700">בוט שמירת אנשי קשר</p>
+        <h2 className="mt-2 text-3xl font-black text-slate-950">כרטיסי איש קשר לשליחה</h2>
+        <p className="mt-3 max-w-3xl leading-7 text-slate-500">
+          המספרים כאן נשלחים למשתתף אחרי הודעת שמירת איש הקשר. עד שני אנשי קשר נשלחים ככרטיס WhatsApp, ושלושה ומעלה נשלחים כקובץ VCF לשמירה מהירה.
+        </p>
+
+        <form action={addContactCardAction} className="mt-6 grid gap-4 md:grid-cols-4">
+          <label className="block">
+            <span className="text-sm font-black text-slate-700">שם איש הקשר</span>
+            <input
+              className="mt-2 h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
+              name="displayName"
+              placeholder="Magic Flow"
+              required
+            />
+          </label>
+          <label className="block">
+            <span className="text-sm font-black text-slate-700">טלפון</span>
+            <input
+              className="mt-2 h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-left outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
+              dir="ltr"
+              name="phone"
+              placeholder="+972542466340"
+              required
+            />
+          </label>
+          <label className="block">
+            <span className="text-sm font-black text-slate-700">חברה / ארגון</span>
+            <input
+              className="mt-2 h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
+              name="organization"
+              placeholder="Magic Flow"
+            />
+          </label>
+          <div className="flex items-end">
+            <button className="h-12 rounded-2xl bg-cyan-600 px-5 font-black text-white" type="submit">
+              הוסף כרטיס
+            </button>
+          </div>
+        </form>
+
+        <div className="mt-6 grid gap-3 md:grid-cols-2">
+          {contactCards.length === 0 ? (
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-bold text-slate-500">
+              עדיין לא הוגדר כרטיס איש קשר לשליחה.
+            </div>
+          ) : (
+            contactCards.map((card: any) => (
+              <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4" key={card.id}>
+                <div>
+                  <p className="font-black text-slate-950">{card.displayName}</p>
+                  <p className="text-sm text-slate-500" dir="ltr">{card.phone}</p>
+                  {card.organization ? <p className="text-sm text-slate-500">{card.organization}</p> : null}
+                </div>
+                <form action={deleteContactCardAction}>
+                  <input name="cardId" type="hidden" value={card.id} />
+                  <button className="h-10 rounded-2xl border border-red-200 px-4 text-sm font-black text-red-700" type="submit">
+                    הסר
+                  </button>
+                </form>
+              </div>
+            ))
+          )}
+        </div>
       </section>
     </main>
   );
