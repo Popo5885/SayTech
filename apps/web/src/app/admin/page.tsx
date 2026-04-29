@@ -6,9 +6,11 @@ import { prisma } from "@lottery/db";
 import { auth } from "../../auth";
 import { AUTH_SETTING_KEYS, getAuthFeatureSettings, setAuthFeatureSetting } from "../../lib/auth-settings";
 import { ownerEmail, sendSystemEmail } from "../../lib/email";
+import { getSmtpAdminSettings, saveSmtpSettings } from "../../lib/email-settings";
 import { createVerificationCode, hashPassword, hashVerificationCode, isEnglishPassword } from "../../lib/password";
 import { normalizeIsraeliPhone } from "../../lib/phone";
 import { provisionWorkspaceForUser } from "../../lib/provisioning";
+import { AdminMobileMenu } from "../../components/admin-mobile-menu";
 
 const db = prisma as any;
 
@@ -494,21 +496,24 @@ async function saveAuthSettingsAction(formData: FormData) {
   "use server";
 
   const admin = await requireAdminUser();
+  const googleLoginEnabled = formData.get("googleLoginEnabled") === "on";
+  const whatsappLoginEnabled = formData.get("whatsappLoginEnabled") === "on";
+  const whatsappManualCodeEnabled = formData.get("whatsappManualCodeEnabled") === "on";
 
   await Promise.all([
     setAuthFeatureSetting(
       AUTH_SETTING_KEYS.googleLoginEnabled,
-      formData.get("googleLoginEnabled") === "on",
+      googleLoginEnabled,
       admin.id
     ),
     setAuthFeatureSetting(
       AUTH_SETTING_KEYS.whatsappLoginEnabled,
-      formData.get("whatsappLoginEnabled") === "on",
+      whatsappLoginEnabled,
       admin.id
     ),
     setAuthFeatureSetting(
       AUTH_SETTING_KEYS.whatsappManualCodeEnabled,
-      formData.get("whatsappManualCodeEnabled") === "on",
+      whatsappManualCodeEnabled,
       admin.id
     )
   ]);
@@ -519,16 +524,96 @@ async function saveAuthSettingsAction(formData: FormData) {
       action: "AUTH_SETTINGS_UPDATED",
       targetType: "SiteSetting",
       metadata: {
-        googleLoginEnabled: formData.get("googleLoginEnabled") === "on",
-        whatsappLoginEnabled: formData.get("whatsappLoginEnabled") === "on",
-        whatsappManualCodeEnabled: formData.get("whatsappManualCodeEnabled") === "on"
+        googleLoginEnabled,
+        whatsappLoginEnabled,
+        whatsappManualCodeEnabled
       }
     }
   });
   revalidatePath("/admin");
   revalidatePath("/login");
   revalidatePath("/register");
-  redirect("/admin?saved=auth#auth-settings");
+
+  const nextSettings = await getAuthFeatureSettings();
+  const missing: string[] = [];
+
+  if (googleLoginEnabled && !nextSettings.googleConfigured) {
+    missing.push("google-secret");
+  }
+
+  if (whatsappLoginEnabled && !nextSettings.whatsappSenderConfigured && !whatsappManualCodeEnabled) {
+    missing.push("whatsapp-sender");
+  }
+
+  redirect(`/admin?saved=auth${missing.length ? `&missing=${missing.join(",")}` : ""}#auth-settings`);
+}
+
+async function saveSmtpSettingsAction(formData: FormData) {
+  "use server";
+
+  const admin = await requireAdminUser();
+  const host = String(formData.get("smtpHost") ?? "").trim() || "smtp.gmail.com";
+  const port = Number(formData.get("smtpPort") ?? 465);
+  const user = String(formData.get("smtpUser") ?? "").trim().toLowerCase();
+  const from = String(formData.get("smtpFrom") ?? "").trim().toLowerCase() || user;
+  const pass = String(formData.get("smtpPass") ?? "").trim();
+  const secure = formData.get("smtpSecure") === "on";
+
+  if (!host || !user || !from || !Number.isFinite(port)) {
+    redirect("/admin?error=smtp-missing#smtp-settings");
+  }
+
+  try {
+    await saveSmtpSettings({ host, port, user, from, pass, secure }, admin.id);
+  } catch (error) {
+    console.error("[admin:smtp-settings-failed]", error);
+    redirect("/admin?error=smtp-save#smtp-settings");
+  }
+
+  await db.adminAuditLog.create({
+    data: {
+      actorUserId: admin.id,
+      action: "SMTP_SETTINGS_UPDATED",
+      targetType: "SiteSetting",
+      metadata: {
+        host,
+        port,
+        user,
+        from,
+        secure,
+        passUpdated: Boolean(pass)
+      }
+    }
+  });
+
+  revalidatePath("/admin");
+  const status = await getSmtpAdminSettings();
+  redirect(`/admin?saved=smtp${status.missing.length ? `&missing=${status.missing.join(",")}` : ""}#smtp-settings`);
+}
+
+async function sendTestEmailAction() {
+  "use server";
+
+  const admin = await requireAdminUser();
+  const sent = await sendSystemEmail({
+    to: ownerEmail(),
+    subject: "בדיקת מייל מ-Magic Flow",
+    html: `<h1>בדיקת מייל הצליחה</h1><p>הגדרות SMTP במערכת פעילות. אפשר לשלוח פניות, איפוסי סיסמה ועדכונים.</p>`
+  });
+
+  await db.adminAuditLog.create({
+    data: {
+      actorUserId: admin.id,
+      action: sent ? "SMTP_TEST_EMAIL_SENT" : "SMTP_TEST_EMAIL_FAILED",
+      targetType: "SiteSetting",
+      metadata: {
+        to: ownerEmail()
+      }
+    }
+  });
+
+  revalidatePath("/admin");
+  redirect(sent ? "/admin?saved=smtp-test#smtp-settings" : "/admin?error=smtp-test#smtp-settings");
 }
 
 async function setManualWhatsAppLoginCodeAction(formData: FormData) {
@@ -610,7 +695,7 @@ function textAreaClass() {
 export default async function AdminPage({
   searchParams
 }: {
-  searchParams?: Promise<{ error?: string; saved?: string }>;
+  searchParams?: Promise<{ error?: string; saved?: string; missing?: string }>;
 }) {
   const params = await searchParams;
   const session = await auth();
@@ -660,6 +745,8 @@ export default async function AdminPage({
     siteSettings.map((setting: any) => [setting.key, String(setting.value)] as [string, string])
   );
   const authSettings = await getAuthFeatureSettings();
+  const smtpSettings = await getSmtpAdminSettings();
+  const missingCodes = new Set((params?.missing ?? "").split(",").filter(Boolean));
   const operationalChecks = [
     {
       label: "Auth",
@@ -691,9 +778,9 @@ export default async function AdminPage({
     },
     {
       label: "SMTP",
-      value: process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS ? "פעיל" : "לא מוגדר",
-      ok: Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS),
-      note: "נדרש לשליחת איפוס סיסמה, אישורים וניוזלטרים."
+      value: smtpSettings.configured ? "פעיל" : `חסר ${smtpSettings.missing.join(", ")}`,
+      ok: smtpSettings.configured,
+      note: "נדרש לשליחת פניות, איפוסי סיסמה, אישורי חשבון וניוזלטרים."
     },
     {
       label: "הצפנת טוקנים",
@@ -706,9 +793,14 @@ export default async function AdminPage({
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-8" dir="rtl">
       <div className="mx-auto max-w-7xl space-y-6">
-        <header className="rounded-[32px] bg-slate-950 p-8 text-white">
-          <p className="text-sm font-bold text-cyan-200">מערכת ניהול</p>
-          <h1 className="mt-3 text-4xl font-black">ניהול Magic Flow</h1>
+        <header className="rounded-[32px] bg-slate-950 p-6 text-white md:p-8">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-bold text-cyan-200">מערכת ניהול</p>
+              <h1 className="mt-3 text-4xl font-black">ניהול Magic Flow</h1>
+            </div>
+            <AdminMobileMenu />
+          </div>
           <p className="mt-3 text-slate-300">לקוחות, חיבורים, אוטומציות, ניוזלטרים, קבלות ותוכן האתר במקום אחד.</p>
           <p className="mt-5 text-sm text-slate-400">מייל מנהל: <span dir="ltr">{ownerEmail()}</span></p>
         </header>
@@ -722,6 +814,7 @@ export default async function AdminPage({
                 ["לקוחות", "#customers", "אישור, השהיה וכניסה לממשק לקוח"],
                 ["חיבורי WhatsApp", "#connections", "הוספת Official או כלי צוות"],
                 ["כניסות", "#auth-settings", "Google ו-WhatsApp OTP"],
+                ["מיילים", "#smtp-settings", "SMTP, App Password ומייל בדיקה"],
                 ["אוטומציות", "#automations", "שליחה בזמן קבוע או אחרי הצטרפות"],
                 ["קבלות", "#billing", "תשלומים, קבלות ותוספים"]
               ].map(([title, href, description]) => (
@@ -785,8 +878,51 @@ export default async function AdminPage({
         ) : null}
 
         {params?.saved === "auth" ? (
+          <div className={`rounded-[28px] border p-5 text-sm font-bold leading-7 ${
+            missingCodes.has("google-secret") || missingCodes.has("whatsapp-sender")
+              ? "border-amber-200 bg-amber-50 text-amber-900"
+              : "border-emerald-200 bg-emerald-50 text-emerald-900"
+          }`}>
+            הגדרות הכניסה נשמרו.
+            {missingCodes.has("google-secret") ? (
+              <span className="block">כדי ש-Google יופיע ללקוחות צריך להגדיר בשרת את <span dir="ltr">GOOGLE_CLIENT_SECRET</span> ואז להפעיל מחדש.</span>
+            ) : null}
+            {missingCodes.has("whatsapp-sender") ? (
+              <span className="block">כדי לשלוח קודי WhatsApp אוטומטית צריך לחבר שולח WhatsApp Official או להפעיל קוד ידני מהממשק.</span>
+            ) : null}
+          </div>
+        ) : null}
+
+        {params?.saved === "smtp" ? (
+          <div className={`rounded-[28px] border p-5 text-sm font-bold leading-7 ${
+            smtpSettings.configured
+              ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+              : "border-amber-200 bg-amber-50 text-amber-900"
+          }`}>
+            הגדרות המייל נשמרו.
+            {!smtpSettings.configured ? (
+              <span className="block">עדיין חסר: <span dir="ltr">{smtpSettings.missing.join(", ")}</span>.</span>
+            ) : (
+              <span className="block">אפשר לשלוח עכשיו מייל בדיקה ולוודא שהוא מגיע.</span>
+            )}
+          </div>
+        ) : null}
+
+        {params?.saved === "smtp-test" ? (
           <div className="rounded-[28px] border border-emerald-200 bg-emerald-50 p-5 text-sm font-bold leading-7 text-emerald-900">
-            הגדרות הכניסה נשמרו בהצלחה.
+            מייל בדיקה נשלח לכתובת המנהל.
+          </div>
+        ) : null}
+
+        {params?.error === "smtp-test" ? (
+          <div className="rounded-[28px] border border-red-200 bg-red-50 p-5 text-sm font-bold leading-7 text-red-800">
+            מייל הבדיקה לא נשלח. בדוק את SMTP_PASS, את כתובת המייל ואת הרשאות Gmail App Password.
+          </div>
+        ) : null}
+
+        {params?.error === "smtp-missing" || params?.error === "smtp-save" ? (
+          <div className="rounded-[28px] border border-red-200 bg-red-50 p-5 text-sm font-bold leading-7 text-red-800">
+            לא ניתן לשמור את הגדרות המייל. מלא Host, Port, User ו-From. אם שמרת סיסמה בפרודקשן, נדרש גם WORKSPACE_TOKEN_ENCRYPTION_KEY.
           </div>
         ) : null}
 
@@ -828,13 +964,47 @@ export default async function AdminPage({
         </section>
 
         <section className="grid gap-6 xl:grid-cols-2" id="auth-settings">
-          <div className="rounded-[32px] bg-white p-6 shadow-sm">
+          <div className="rounded-[32px] border border-emerald-100 bg-white p-6 shadow-sm">
             <h2 className="text-2xl font-black text-slate-950">הגדרות כניסה</h2>
             <p className="mt-2 text-sm leading-6 text-slate-500">
               כאן מפעילים או מכבים כניסה עם Google ו-WhatsApp. Google יופיע ללקוחות רק אם קיים GOOGLE_CLIENT_SECRET בסביבת השרת.
             </p>
+            <div className="mt-5 grid gap-3 md:grid-cols-2">
+              <div className={`rounded-2xl border p-4 ${
+                authSettings.googleLoginEnabled
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-950"
+                  : authSettings.googleLoginAdminEnabled
+                    ? "border-amber-200 bg-amber-50 text-amber-950"
+                    : "border-slate-200 bg-slate-50 text-slate-700"
+              }`}>
+                <p className="text-sm font-black">Google</p>
+                <p className="mt-1 text-xs font-bold leading-5">
+                  {authSettings.googleLoginEnabled
+                    ? "פעיל ללקוחות"
+                    : authSettings.googleLoginAdminEnabled
+                      ? "נשמר בממשק, חסר GOOGLE_CLIENT_SECRET"
+                      : "כבוי"}
+                </p>
+              </div>
+              <div className={`rounded-2xl border p-4 ${
+                authSettings.whatsappLoginEnabled
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-950"
+                  : "border-slate-200 bg-slate-50 text-slate-700"
+              }`}>
+                <p className="text-sm font-black">WhatsApp OTP</p>
+                <p className="mt-1 text-xs font-bold leading-5">
+                  {authSettings.whatsappLoginEnabled
+                    ? authSettings.whatsappSenderConfigured
+                      ? "פעיל עם שולח אוטומטי"
+                      : authSettings.whatsappManualCodeEnabled
+                        ? "פעיל עם קוד ידני"
+                        : "פעיל, אבל חסר שולח"
+                    : "כבוי"}
+                </p>
+              </div>
+            </div>
             <form action={saveAuthSettingsAction} className="mt-5 space-y-3">
-              <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-bold text-slate-800">
+              <label className="flex items-start gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4 text-sm font-bold text-slate-800">
                 <input
                   className="mt-1"
                   defaultChecked={authSettings.googleLoginAdminEnabled}
@@ -848,7 +1018,7 @@ export default async function AdminPage({
                   </span>
                 </span>
               </label>
-              <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-bold text-slate-800">
+              <label className="flex items-start gap-3 rounded-2xl border border-cyan-100 bg-cyan-50/70 p-4 text-sm font-bold text-slate-800">
                 <input
                   className="mt-1"
                   defaultChecked={authSettings.whatsappLoginEnabled}
@@ -862,7 +1032,7 @@ export default async function AdminPage({
                   </span>
                 </span>
               </label>
-              <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-bold text-slate-800">
+              <label className="flex items-start gap-3 rounded-2xl border border-violet-100 bg-violet-50/70 p-4 text-sm font-bold text-slate-800">
                 <input
                   className="mt-1"
                   defaultChecked={authSettings.whatsappManualCodeEnabled}
@@ -876,13 +1046,13 @@ export default async function AdminPage({
                   </span>
                 </span>
               </label>
-              <button className="h-11 rounded-2xl bg-slate-950 px-5 font-black text-white" type="submit">
+              <button className="h-11 rounded-2xl bg-gradient-to-l from-emerald-500 to-cyan-500 px-5 font-black text-slate-950 shadow-[0_14px_35px_rgba(20,184,166,0.22)] transition hover:-translate-y-0.5" type="submit">
                 שמור הגדרות כניסה
               </button>
             </form>
           </div>
 
-          <div className="rounded-[32px] bg-white p-6 shadow-sm">
+          <div className="rounded-[32px] border border-cyan-100 bg-white p-6 shadow-sm">
             <h2 className="text-2xl font-black text-slate-950">קוד WhatsApp ידני</h2>
             <p className="mt-2 text-sm leading-6 text-slate-500">
               אם אין עדיין שליחת WhatsApp פעילה, אפשר להגדיר קוד זמני למשתמש פעיל לפי מספר הטלפון שלו.
@@ -902,6 +1072,72 @@ export default async function AdminPage({
               </button>
             </form>
           </div>
+        </section>
+
+        <section className="rounded-[32px] border border-cyan-100 bg-white p-6 shadow-sm" id="smtp-settings">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <p className="text-sm font-black text-cyan-700">מערכת מיילים</p>
+              <h2 className="mt-2 text-2xl font-black text-slate-950">SMTP לפניות, אישורים ואיפוסי סיסמה</h2>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
+                אם פנייה נשמרה אבל לא קיבלת מייל, כמעט תמיד חסר SMTP_PASS. אפשר להשלים כאן את פרטי Gmail App Password ולשלוח מייל בדיקה.
+              </p>
+            </div>
+            <span className={`inline-flex w-fit rounded-full px-4 py-2 text-xs font-black ${
+              smtpSettings.configured
+                ? "bg-emerald-100 text-emerald-800"
+                : "bg-amber-100 text-amber-900"
+            }`}>
+              {smtpSettings.configured ? "מוגדר ופעיל" : `חסר: ${smtpSettings.missing.join(", ")}`}
+            </span>
+          </div>
+
+          <div className="mt-5 grid gap-3 md:grid-cols-5">
+            {[
+              ["Host", smtpSettings.host, smtpSettings.source.host],
+              ["User", smtpSettings.user, smtpSettings.source.user],
+              ["From", smtpSettings.from, smtpSettings.source.from],
+              ["Port", String(smtpSettings.port), smtpSettings.source.port],
+              ["Password", smtpSettings.passConfigured ? "מוגדר" : "חסר", smtpSettings.source.pass]
+            ].map(([label, value, source]) => (
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4" key={label}>
+                <p className="text-xs font-black uppercase tracking-wide text-slate-400">{label}</p>
+                <p className="mt-2 truncate text-sm font-black text-slate-950" dir={label === "Password" ? "rtl" : "ltr"}>{value}</p>
+                <p className="mt-1 text-xs font-bold text-slate-500">מקור: {source}</p>
+              </div>
+            ))}
+          </div>
+
+          <form action={saveSmtpSettingsAction} className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+            <Field label="SMTP Host">
+              <input className={inputClass()} defaultValue={smtpSettings.host} dir="ltr" name="smtpHost" required />
+            </Field>
+            <Field label="SMTP Port">
+              <input className={inputClass()} defaultValue={smtpSettings.port} dir="ltr" min="1" name="smtpPort" required type="number" />
+            </Field>
+            <Field label="SMTP User">
+              <input className={inputClass()} defaultValue={smtpSettings.user} dir="ltr" name="smtpUser" required type="email" />
+            </Field>
+            <Field label="SMTP From">
+              <input className={inputClass()} defaultValue={smtpSettings.from} dir="ltr" name="smtpFrom" required type="email" />
+            </Field>
+            <Field label="SMTP Password / App Password">
+              <input className={inputClass()} dir="ltr" name="smtpPass" placeholder={smtpSettings.passConfigured ? "השאר ריק כדי לא לשנות" : "חובה למיילים"} type="password" />
+            </Field>
+            <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-black text-slate-700 xl:col-span-2">
+              <input defaultChecked={smtpSettings.secure} name="smtpSecure" type="checkbox" />
+              חיבור מאובטח SSL/TLS
+            </label>
+            <button className="h-11 rounded-2xl bg-gradient-to-l from-cyan-400 to-emerald-400 px-5 font-black text-slate-950 shadow-[0_14px_35px_rgba(34,211,238,0.18)] transition hover:-translate-y-0.5 xl:col-span-2" type="submit">
+              שמור הגדרות מייל
+            </button>
+          </form>
+
+          <form action={sendTestEmailAction} className="mt-3">
+            <button className="h-11 rounded-2xl border border-cyan-200 bg-cyan-50 px-5 text-sm font-black text-cyan-900 transition hover:bg-cyan-100" type="submit">
+              שלח מייל בדיקה למנהל
+            </button>
+          </form>
         </section>
 
         <section className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]" id="customers">

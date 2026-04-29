@@ -1,5 +1,6 @@
 import net from "node:net";
 import tls from "node:tls";
+import { getSmtpConfig, type SmtpConfig } from "./email-settings";
 
 type SendEmailInput = {
   to: string;
@@ -12,35 +13,6 @@ type SendEmailInput = {
     contentType: string;
   }>;
 };
-
-type SmtpConfig = {
-  host: string;
-  port: number;
-  user: string;
-  pass: string;
-  from: string;
-  secure: boolean;
-};
-
-function getSmtpConfig(): SmtpConfig | null {
-  const host = process.env.SMTP_HOST ?? "smtp.gmail.com";
-  const user = process.env.SMTP_USER ?? "magicflow11284@gmail.com";
-  const pass = process.env.SMTP_PASS;
-  const from = process.env.SMTP_FROM ?? user;
-
-  if (!host || !user || !pass || !from) {
-    return null;
-  }
-
-  return {
-    host,
-    port: Number(process.env.SMTP_PORT ?? 465),
-    user,
-    pass,
-    from,
-    secure: process.env.SMTP_SECURE !== "false"
-  };
-}
 
 function escapeHeader(value: string): string {
   return value.replace(/[\r\n]+/g, " ").trim();
@@ -208,7 +180,7 @@ async function sendViaSmtp(input: SendEmailInput, config: SmtpConfig): Promise<v
 }
 
 export async function sendSystemEmail(input: SendEmailInput): Promise<boolean> {
-  const config = getSmtpConfig();
+  const config = await getSmtpConfig();
 
   if (!config) {
     console.info(`[email:skipped] ${input.to} - ${input.subject}`);

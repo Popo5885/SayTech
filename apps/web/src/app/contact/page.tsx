@@ -51,7 +51,7 @@ async function contactAction(formData: FormData) {
     console.error("[contact:email-failed]", { visitorMailSent, ownerMailSent, leadEmail: email });
   }
 
-  redirect("/contact?sent=1");
+  redirect(`/contact?sent=1${visitorMailSent && ownerMailSent ? "" : "&mail=0"}`);
 }
 
 export default async function ContactPage({
@@ -62,6 +62,7 @@ export default async function ContactPage({
   const params = await searchParams;
   const sent = params?.sent === "1";
   const hasError = params?.error === "missing";
+  const mailFailed = params?.mail === "0";
 
   return (
     <main className="aurora-surface relative min-h-screen overflow-hidden bg-[#070914] px-4 py-10 text-white" dir="rtl">
@@ -123,6 +124,11 @@ export default async function ContactPage({
               <p className="mt-2 text-sm leading-6 text-emerald-100">
                 צוות Magic Flow יחזור אליך בהקדם.
               </p>
+              {mailFailed ? (
+                <p className="mt-3 rounded-2xl border border-amber-200/30 bg-amber-200/15 p-3 text-sm font-bold leading-6 text-amber-50">
+                  הפנייה נשמרה במערכת. מייל האישור לא יצא כי הגדרות SMTP עדיין לא מלאות.
+                </p>
+              ) : null}
             </div>
           ) : (
             <form action={contactAction} className="mt-6 space-y-4">

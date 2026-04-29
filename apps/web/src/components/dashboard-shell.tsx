@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
-import { Link2, LogOut, MessageSquareText, Settings, Trophy, UsersRound } from "lucide-react";
+import { Link2, LogOut, Menu, MessageSquareText, Settings, Trophy, UsersRound, X } from "lucide-react";
+import { useState } from "react";
 import { cn } from "@lottery/ui";
 import { GuidedTourButton } from "./guided-tour-button";
 
@@ -21,6 +22,7 @@ export function DashboardShell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-[#f7f8fb]" dir="rtl">
@@ -71,42 +73,60 @@ export function DashboardShell({
         </aside>
 
         <main className="min-w-0 flex-1">
-          <div className="mb-6 rounded-[28px] border border-slate-200 bg-white/88 px-5 py-4 shadow-[0_16px_50px_rgba(15,23,42,0.05)] backdrop-blur">
-            <p className="text-sm font-black text-emerald-700">Magic Flow</p>
-            <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-950">
-              לוח עבודה
-            </h1>
-            <nav className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5 lg:hidden">
-              {navItems.map((item) => {
-                const Icon = item.icon;
-                const active = pathname === item.href;
+          <div className="relative mb-6 rounded-[28px] border border-slate-200 bg-white/88 px-5 py-4 shadow-[0_16px_50px_rgba(15,23,42,0.05)] backdrop-blur">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-black text-emerald-700">Magic Flow</p>
+                <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-950">
+                  לוח עבודה
+                </h1>
+              </div>
+              <button
+                aria-expanded={mobileMenuOpen}
+                aria-label={mobileMenuOpen ? "סגירת תפריט" : "פתיחת תפריט"}
+                className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-800 lg:hidden"
+                onClick={() => setMobileMenuOpen((value) => !value)}
+                type="button"
+              >
+                {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+              </button>
+            </div>
+            {mobileMenuOpen ? (
+              <div className="absolute inset-x-4 top-[5.4rem] z-40 rounded-[24px] border border-slate-200 bg-white p-3 shadow-2xl lg:hidden">
+                <nav className="grid gap-2">
+                  {navItems.map((item) => {
+                    const Icon = item.icon;
+                    const active = pathname === item.href;
 
-                return (
-                  <Link
-                    className={cn(
-                      "inline-flex h-11 items-center justify-center gap-2 rounded-2xl text-sm font-black transition",
-                      active
-                        ? "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-100"
-                        : "bg-slate-50 text-slate-700"
-                    )}
-                    data-tour={item.tour}
-                    href={item.href}
-                    key={item.href}
-                  >
-                    <Icon className="h-4 w-4" />
-                    {item.label}
-                  </Link>
-                );
-              })}
-            </nav>
-            <button
-              className="mt-3 inline-flex h-10 items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-black text-slate-700 lg:hidden"
-              onClick={() => void signOut({ callbackUrl: "/" })}
-              type="button"
-            >
-              <LogOut className="h-4 w-4" />
-              יציאה
-            </button>
+                    return (
+                      <Link
+                        className={cn(
+                          "inline-flex h-12 items-center gap-3 rounded-2xl px-4 text-sm font-black transition",
+                          active
+                            ? "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-100"
+                            : "bg-slate-50 text-slate-700"
+                        )}
+                        data-tour={item.tour}
+                        href={item.href}
+                        key={item.href}
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        <Icon className="h-4 w-4" />
+                        {item.label}
+                      </Link>
+                    );
+                  })}
+                </nav>
+                <button
+                  className="mt-2 inline-flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-black text-slate-700"
+                  onClick={() => void signOut({ callbackUrl: "/" })}
+                  type="button"
+                >
+                  <LogOut className="h-4 w-4" />
+                  יציאה
+                </button>
+              </div>
+            ) : null}
           </div>
 
           <GuidedTourButton autoStart showButton={false} />

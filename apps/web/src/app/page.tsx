@@ -15,6 +15,7 @@ import {
   Zap
 } from "lucide-react";
 import { prisma } from "@lottery/db";
+import { LandingMobileMenu } from "../components/landing-mobile-menu";
 
 const phone = "054-246-6340";
 const db = prisma as any;
@@ -185,6 +186,7 @@ export default async function LandingPage() {
           <Link className="magnetic-cta rounded-2xl bg-white px-4 py-2 text-sm font-black text-slate-950 transition hover:-translate-y-0.5" href="/register">
             הרשמה
           </Link>
+          <LandingMobileMenu />
         </div>
       </header>
 
