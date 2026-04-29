@@ -208,7 +208,7 @@ export async function provisionWorkspaceForUser(userId: string) {
         data: {
           id: connectionId,
           workspaceId: workspace.id,
-          provider: "unofficial_qr",
+          provider: "official_business",
           label: "המספר בהכנה",
           status: "idle",
           maxTenants: 0,

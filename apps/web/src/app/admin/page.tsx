@@ -5,6 +5,7 @@ import { prisma } from "@lottery/db";
 import { auth } from "../../auth";
 import { ownerEmail, sendSystemEmail } from "../../lib/email";
 import { createVerificationCode, hashVerificationCode } from "../../lib/password";
+import { normalizeIsraeliPhone } from "../../lib/phone";
 import { provisionWorkspaceForUser } from "../../lib/provisioning";
 
 const db = prisma as any;
@@ -267,8 +268,8 @@ async function createConnectionAction(formData: FormData) {
   await requireAdminUser();
   const workspaceId = String(formData.get("workspaceId") ?? "");
   const label = String(formData.get("label") ?? "חיבור WhatsApp").trim();
-  const phoneNumber = String(formData.get("phoneNumber") ?? "").trim();
-  const provider = String(formData.get("provider") ?? "unofficial_qr");
+  const phoneNumber = normalizeIsraeliPhone(String(formData.get("phoneNumber") ?? "").trim());
+  const provider = String(formData.get("provider") ?? "official_business");
   const maxTenants = Math.max(1, Number(formData.get("maxTenants") ?? 3));
 
   if (!workspaceId) {
@@ -280,7 +281,7 @@ async function createConnectionAction(formData: FormData) {
       workspaceId,
       provider,
       label,
-      phoneNumber: phoneNumber || null,
+      phoneNumber,
       status: phoneNumber ? "connected" : "idle",
       maxTenants,
       sessionKey: `admin_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
@@ -650,8 +651,8 @@ export default async function AdminPage() {
               </Field>
               <Field label="סוג">
                 <select className={selectClass()} name="provider">
-                  <option value="unofficial_qr">WhatsApp Web</option>
-                  <option value="official_business">WhatsApp Business Cloud</option>
+                  <option value="official_business">WhatsApp Business Cloud · רשמי</option>
+                  <option value="unofficial_qr">WhatsApp Web · כלי צוות בלבד</option>
                 </select>
               </Field>
               <Field label="מקסימום לקוחות">

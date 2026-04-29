@@ -37,7 +37,7 @@ function statusLabel(snapshot: ConnectionSnapshot): string {
   }
 
   if (snapshot.status === "connected") {
-    return "מחובר";
+    return "מחובר לתשתית WhatsApp Official";
   }
 
   if (snapshot.status === "qr_ready" || snapshot.status === "connecting") {
@@ -147,7 +147,7 @@ export function SimpleDashboard({
   const joinPath = useMemo(() => `/join/${campaign.slug}`, [campaign.slug]);
 
   return (
-    <div className="space-y-6" dir="rtl">
+    <div className="space-y-6 animate-[fadeUp_0.55s_ease-out]" dir="rtl">
       <section className="rounded-[32px] border border-slate-200 bg-white/82 p-6 shadow-[0_18px_70px_rgba(15,23,42,0.06)] backdrop-blur">
         <p className="text-sm font-black text-emerald-700">דשבורד יומי</p>
         <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-950 md:text-4xl">
@@ -245,7 +245,7 @@ function DashboardActionCard({
   title: string;
 }) {
   return (
-    <Card className="flex min-h-[290px] flex-col justify-between border-white/70 bg-white/82 shadow-[0_18px_70px_rgba(15,23,42,0.07)] backdrop-blur" data-tour={dataTour}>
+    <Card className="border-beam-card flex min-h-[290px] flex-col justify-between border-white/70 bg-white/82 shadow-[0_18px_70px_rgba(15,23,42,0.07)] backdrop-blur" data-tour={dataTour}>
       <div>
         <div className="mb-7 flex items-center justify-between gap-4">
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-950 text-white">

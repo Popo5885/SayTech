@@ -20,7 +20,7 @@ export default async function DashboardLayout({
   const user = session.user as any;
 
   if (user.accountStatus !== "active") {
-    redirect("/pending");
+    redirect("/waiting-room");
   }
 
   const adminEmail = (process.env.SUPERADMIN_EMAIL ?? "aknvpupuch@gmail.com").toLowerCase();

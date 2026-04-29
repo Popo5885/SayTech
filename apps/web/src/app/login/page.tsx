@@ -76,7 +76,7 @@ export default async function LoginPage({
 
           {hasCredentialsError ? (
             <div className="mt-5 rounded-3xl border border-amber-300/25 bg-amber-300/12 p-4 text-sm font-semibold leading-7 text-amber-100">
-              <p>פרטי הכניסה אינם נכונים. אולי כדאי לפתוח חשבון חדש?</p>
+              <p>פרטים לא מזוהים. רוצה לפתוח חשבון חדש?</p>
               <Link className="mt-3 inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-2 font-black text-slate-950 transition hover:-translate-y-0.5" href={registerHref}>
                 פתיחת חשבון עכשיו
                 <ArrowLeft className="h-4 w-4" />

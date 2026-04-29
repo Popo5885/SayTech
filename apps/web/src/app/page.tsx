@@ -98,7 +98,31 @@ export default async function LandingPage() {
   const landingSubtitle =
     landingContent.subtitle ||
     "Magic Flow עוזרת לבעלי עסקים ליצור הגרלה, לאסוף משתתפים, לזהות מפנים, לשמור אנשי קשר ולבצע הגרלה שקופה. הכל בעברית, פשוט ונקי.";
-  const landingPrice = landingContent.price || "1,000 ₪";
+  const landingPrice = landingContent.price || "999 ₪";
+  const pricingTiers = [
+    {
+      name: "Starter",
+      price: "499 ₪",
+      badge: "כניסה נקייה",
+      glow: "from-slate-200/18 to-white/[0.04]",
+      features: ["קמפיין אחד", "עד 500 משתתפים", "WhatsApp Official כלול", "משימת סטטוס בסיסית", "ללא מבצעי בזק"]
+    },
+    {
+      name: "Pro",
+      price: landingPrice,
+      badge: "הכי פופולרי",
+      glow: "from-cyan-300/18 to-violet-500/12",
+      featured: true,
+      features: ["עד 3 קמפיינים", "עד 2,500 משתתפים", "WhatsApp Official כלול", "אימות AI אוטומטי", "50% הנחה על מבצעי בזק"]
+    },
+    {
+      name: "Enterprise",
+      price: "דברו איתנו",
+      badge: "Glow פרימיום",
+      glow: "from-emerald-300/16 to-cyan-300/10",
+      features: ["קמפיינים ללא הגבלה", "משתתפים ללא הגבלה", "WhatsApp Official כלול", "אימות AI אוטומטי", "מבצעי בזק ללא הגבלה"]
+    }
+  ];
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#070914] text-white" dir="rtl">
@@ -244,20 +268,45 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      <section className="relative z-10 mx-auto max-w-5xl px-5 py-20 text-center lg:px-8" id="pricing">
-        <div className="rounded-[2.5rem] border border-cyan-200/20 bg-gradient-to-br from-white/[0.12] to-white/[0.04] p-8 shadow-2xl backdrop-blur-xl md:p-12">
-          <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-cyan-300/15 text-cyan-100">
-            <Trophy className="h-7 w-7" />
-          </div>
-          <h2 className="text-3xl font-black md:text-5xl">מסלול פרימיום מלא</h2>
+      <section className="relative z-10 mx-auto max-w-7xl px-5 py-20 lg:px-8" id="pricing">
+        <div className="mb-10 text-center">
+          <p className="text-sm font-black text-cyan-200">מחירון פרימיום</p>
+          <h2 className="mt-3 text-3xl font-black md:text-5xl">בחרו את המסלול שמתאים לקצב הצמיחה</h2>
           <p className="mx-auto mt-4 max-w-2xl text-lg leading-8 text-slate-300">
-            כולל עמוד בית, דשבורד, עורך הודעות, חיבורי WhatsApp, אנשי קשר, הדרכות וניהול בסיסי.
+            כל המסלולים עובדים על תשתית WhatsApp Official, עם כניסה מבוקרת וללא נתוני דמו.
           </p>
-          <div className="my-8 text-6xl font-black">{landingPrice}</div>
-          <Link className="inline-flex h-14 items-center gap-2 rounded-2xl bg-white px-7 font-black text-slate-950 transition hover:-translate-y-0.5" href="/contact">
-            דברו עם הצוות
-            <MousePointer2 className="h-5 w-5" />
-          </Link>
+        </div>
+        <div className="grid gap-5 lg:grid-cols-3">
+          {pricingTiers.map((tier) => (
+            <article
+              className={`group ${tier.featured ? "border-beam-card scale-[1.02] border-cyan-200/40" : "border-white/10"} rounded-[2.25rem] border bg-gradient-to-br ${tier.glow} p-6 shadow-2xl backdrop-blur-xl transition duration-300 hover:-translate-y-2`}
+              key={tier.name}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 text-cyan-100">
+                  {tier.featured ? <Zap className="h-6 w-6" /> : <Trophy className="h-6 w-6" />}
+                </div>
+                <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-black text-cyan-100">
+                  {tier.badge}
+                </span>
+              </div>
+              <h3 className="mt-6 text-3xl font-black">{tier.name}</h3>
+              <div className="mt-4 text-5xl font-black">{tier.price}</div>
+              <p className="mt-2 text-sm font-semibold text-slate-400">לחודש, ללא נתונים מומצאים וללא מסכים עמוסים.</p>
+              <ul className="mt-7 space-y-3 text-right">
+                {tier.features.map((feature) => (
+                  <li className="flex items-start gap-3 text-sm font-bold leading-6 text-slate-200" key={feature}>
+                    <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-300" />
+                    <span>{feature}</span>
+                  </li>
+                ))}
+              </ul>
+              <Link className="mt-8 inline-flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-white px-5 py-4 font-black text-slate-950 transition hover:-translate-y-0.5 hover:shadow-[0_0_40px_rgba(34,211,238,0.25)]" href="/contact">
+                דברו עם הצוות
+                <MousePointer2 className="h-5 w-5" />
+              </Link>
+            </article>
+          ))}
         </div>
       </section>
 

@@ -9,7 +9,7 @@ export default async function DashboardConnectionsPage() {
     return (
       <EmptyWorkspaceState
         title="אין חיבור להצגה"
-        description="אחרי שהחשבון יופעל ויוקצה לו מספר, יופיע כאן סטטוס חיבור מוכן. אין צורך לבצע פעולה טכנית."
+        description="אחרי שהחשבון יופעל ויוקצה לו מספר WhatsApp Official, יופיע כאן סטטוס חיבור מוכן. אין צורך לבצע פעולה טכנית."
       />
     );
   }

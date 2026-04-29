@@ -132,12 +132,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           email === SYSTEM_ADMIN_EMAIL ? "SUPER_ADMIN" : linkedUser.globalRole;
 
         if (linkedUser.accountStatus !== "active") {
-          return "/pending";
+          return "/waiting-room";
         }
       }
 
       if ((user as any).accountStatus && (user as any).accountStatus !== "active") {
-        return "/pending";
+        return "/waiting-room";
       }
 
       return true;

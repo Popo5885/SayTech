@@ -41,16 +41,17 @@ export function ZeroTouchConnectionCard({
             <h2 className="mt-4 text-3xl font-black">
               {ready ? (
                 <>
-                  סטטוס: מחובר · <span dir="ltr">{phone}</span>
+                  סטטוס: מחובר לתשתית WhatsApp Official של Magic Flow ·{" "}
+                  <span dir="ltr">{phone}</span>
                 </>
               ) : (
-                "צוות Magic Flow מכין את החיבור"
+                "צוות Magic Flow מכין את החיבור הרשמי"
               )}
             </h2>
             <p className={`mt-3 max-w-2xl text-sm leading-6 ${ready ? "text-emerald-50" : "text-slate-800"}`}>
               {ready
-                ? "המערכת מוכנה לקבל משתתפים."
-                : "כשהמספר יוקצה, הדשבורד יתעדכן אוטומטית."}
+                ? "המספר מוקצה אוטומטית מהמאגר. אין QR, אין Pairing Code ואין פעולה טכנית מצד הלקוח."
+                : "כשהמספר הרשמי יוקצה, הדשבורד יתעדכן אוטומטית ויהיה מוכן לקבל משתתפים."}
             </p>
           </div>
           {ready ? <CheckCircle2 className="h-12 w-12" /> : <Clock3 className="h-12 w-12" />}

@@ -61,7 +61,7 @@ async function registerAction(formData: FormData) {
     })
   ]);
 
-  redirect("/pending");
+  redirect("/waiting-room");
 }
 
 export default async function RegisterPage({
