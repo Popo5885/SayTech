@@ -15,7 +15,7 @@ async function main() {
 
   const campaignService = new CampaignService(baseUrl);
   const connectionRepository = new WhatsAppConnectionRepository();
-  const connection = await connectionRepository.getPrimaryConnection();
+  const connection = await connectionRepository.getPrimaryConnectionConfig();
 
   if (!connection) {
     throw new Error("No WhatsApp connection found in the database.");
@@ -41,12 +41,12 @@ async function main() {
 
   await queues.start();
   await orchestrator.connect({
-    connectionId: connection.id,
+    connectionId: connection.connectionId,
     sessionKey: connection.sessionKey,
     provider: connection.provider,
     officialPhoneNumberId: connection.officialPhoneNumberId,
     officialWabaId: connection.officialWabaId,
-    officialAccessToken: process.env.META_WHATSAPP_ACCESS_TOKEN ?? null
+    officialAccessToken: connection.officialAccessToken ?? process.env.META_WHATSAPP_ACCESS_TOKEN ?? null
   });
 
   process.stdout.write(`WhatsApp worker listening on Socket.IO port ${socketPort}\n`);

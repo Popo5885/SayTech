@@ -100,6 +100,21 @@ async function writeCommand(socket: net.Socket | tls.TLSSocket, command: string)
   return readResponse(socket);
 }
 
+async function writeExpected(
+  socket: net.Socket | tls.TLSSocket,
+  command: string,
+  expectedCodes: string[]
+): Promise<string> {
+  const response = await writeCommand(socket, command);
+  const code = response.match(/^(\d{3})/m)?.[1];
+
+  if (!code || !expectedCodes.includes(code)) {
+    throw new Error(`SMTP command failed with response: ${response.trim().slice(0, 240)}`);
+  }
+
+  return response;
+}
+
 async function openSocket(config: SmtpConfig): Promise<net.Socket | tls.TLSSocket> {
   return new Promise((resolve, reject) => {
     const socket = config.secure
@@ -113,14 +128,19 @@ async function openSocket(config: SmtpConfig): Promise<net.Socket | tls.TLSSocke
 
 async function sendViaSmtp(input: SendEmailInput, config: SmtpConfig): Promise<void> {
   const socket = await openSocket(config);
-  await readResponse(socket);
-  await writeCommand(socket, `EHLO ${process.env.SMTP_HELO_HOST ?? "magic-flow.local"}`);
-  await writeCommand(socket, "AUTH LOGIN");
-  await writeCommand(socket, Buffer.from(config.user, "utf8").toString("base64"));
-  await writeCommand(socket, Buffer.from(config.pass, "utf8").toString("base64"));
-  await writeCommand(socket, `MAIL FROM:<${config.from}>`);
-  await writeCommand(socket, `RCPT TO:<${input.to}>`);
-  await writeCommand(socket, "DATA");
+  const greeting = await readResponse(socket);
+
+  if (!/^220/m.test(greeting)) {
+    throw new Error(`SMTP greeting failed: ${greeting.trim().slice(0, 240)}`);
+  }
+
+  await writeExpected(socket, `EHLO ${process.env.SMTP_HELO_HOST ?? "magic-flow.local"}`, ["250"]);
+  await writeExpected(socket, "AUTH LOGIN", ["334"]);
+  await writeExpected(socket, Buffer.from(config.user, "utf8").toString("base64"), ["334"]);
+  await writeExpected(socket, Buffer.from(config.pass, "utf8").toString("base64"), ["235"]);
+  await writeExpected(socket, `MAIL FROM:<${config.from}>`, ["250"]);
+  await writeExpected(socket, `RCPT TO:<${input.to}>`, ["250", "251"]);
+  await writeExpected(socket, "DATA", ["354"]);
 
   const html = wrapWithFooter(input.html, input.unsubscribeUrl);
   const message = [
@@ -135,7 +155,7 @@ async function sendViaSmtp(input: SendEmailInput, config: SmtpConfig): Promise<v
     "."
   ].join("\r\n");
 
-  await writeCommand(socket, message);
+  await writeExpected(socket, message, ["250"]);
   await writeCommand(socket, "QUIT");
   socket.end();
 }

@@ -1,6 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { encryptSecret } from "@lottery/core";
 import { prisma } from "@lottery/db";
 import { auth } from "../../auth";
 import { ownerEmail, sendSystemEmail } from "../../lib/email";
@@ -271,6 +272,10 @@ async function createConnectionAction(formData: FormData) {
   const phoneNumber = normalizeIsraeliPhone(String(formData.get("phoneNumber") ?? "").trim());
   const provider = String(formData.get("provider") ?? "official_business");
   const maxTenants = Math.max(1, Number(formData.get("maxTenants") ?? 3));
+  const officialPhoneNumberId = String(formData.get("officialPhoneNumberId") ?? "").trim();
+  const officialWabaId = String(formData.get("officialWabaId") ?? "").trim();
+  const officialAccessToken = String(formData.get("officialAccessToken") ?? "").trim();
+  const officialWebhookVerifyToken = String(formData.get("officialWebhookVerifyToken") ?? "").trim();
 
   if (!workspaceId) {
     redirect("/admin");
@@ -284,6 +289,12 @@ async function createConnectionAction(formData: FormData) {
       phoneNumber,
       status: phoneNumber ? "connected" : "idle",
       maxTenants,
+      officialPhoneNumberId: provider === "official_business" ? officialPhoneNumberId || null : null,
+      officialWabaId: provider === "official_business" ? officialWabaId || null : null,
+      officialAccessTokenEncrypted:
+        provider === "official_business" && officialAccessToken ? encryptSecret(officialAccessToken) : null,
+      officialWebhookVerifyTokenEncrypted:
+        provider === "official_business" && officialWebhookVerifyToken ? encryptSecret(officialWebhookVerifyToken) : null,
       sessionKey: `admin_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
     }
   });
@@ -637,6 +648,15 @@ export default async function AdminPage() {
         <section className="grid gap-6 xl:grid-cols-2">
           <div className="rounded-[32px] bg-white p-6 shadow-sm">
             <h2 className="text-2xl font-black text-slate-950">חיבורי WhatsApp</h2>
+            <div className="mt-4 rounded-3xl border border-emerald-100 bg-emerald-50 p-4 text-sm leading-6 text-emerald-950">
+              <p className="font-black">איך מחברים נכון?</p>
+              <p className="mt-1">
+                חיבור רשמי: מזינים מספר בפורמט <span dir="ltr">+972...</span>, Phone Number ID, WABA ID ו-Access Token ממטא. הטוקן נשמר מוצפן במסד הנתונים.
+              </p>
+              <p className="mt-1">
+                חיבור ברקוד: מיועד לצוות בלבד. הלקוח לא רואה QR או Pairing Code; הוא מקבל חוויית Zero-Touch.
+              </p>
+            </div>
             <form action={createConnectionAction} className="mt-5 grid gap-3 md:grid-cols-2">
               <Field label="Workspace בעל החיבור">
                 <select className={selectClass()} name="workspaceId" required>
@@ -657,6 +677,18 @@ export default async function AdminPage() {
               </Field>
               <Field label="מקסימום לקוחות">
                 <input className={inputClass()} defaultValue="3" min="1" name="maxTenants" type="number" />
+              </Field>
+              <Field label="Meta Phone Number ID">
+                <input className={inputClass()} dir="ltr" name="officialPhoneNumberId" placeholder="1234567890" />
+              </Field>
+              <Field label="Meta WABA ID">
+                <input className={inputClass()} dir="ltr" name="officialWabaId" placeholder="1234567890" />
+              </Field>
+              <Field label="Meta Access Token">
+                <input className={inputClass()} dir="ltr" name="officialAccessToken" placeholder="נשמר מוצפן" type="password" />
+              </Field>
+              <Field label="Webhook Verify Token">
+                <input className={inputClass()} dir="ltr" name="officialWebhookVerifyToken" placeholder="verify-token" type="password" />
               </Field>
               <button className="h-11 self-end rounded-2xl bg-emerald-600 px-5 font-black text-white" type="submit">הוסף חיבור</button>
             </form>

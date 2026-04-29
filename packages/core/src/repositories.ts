@@ -19,6 +19,7 @@ import {
   type WinnerDraw,
   type Workspace
 } from "./domain";
+import type { ProviderConnectionConfig } from "./providers";
 import {
   buildDashboardStats,
   buildLeaderboard,
@@ -102,6 +103,19 @@ function mapConnection(record: any): WhatsAppConnection {
     officialWabaId: record.officialWabaId ?? null,
     lastError: record.lastError,
     updatedAt: record.updatedAt.toISOString()
+  };
+}
+
+function mapProviderConnectionConfig(record: any): ProviderConnectionConfig {
+  return {
+    connectionId: record.id,
+    sessionKey: record.sessionKey,
+    provider: record.provider,
+    officialPhoneNumberId: record.officialPhoneNumberId ?? null,
+    officialWabaId: record.officialWabaId ?? null,
+    officialAccessToken: record.officialAccessTokenEncrypted
+      ? decryptSecret(record.officialAccessTokenEncrypted)
+      : null
   };
 }
 
@@ -386,6 +400,16 @@ export class WorkspaceRepository {
 }
 
 export class WhatsAppConnectionRepository {
+  async getPrimaryConnectionConfig(): Promise<ProviderConnectionConfig | null> {
+    const connection = await db.whatsAppConnection.findFirst({
+      orderBy: {
+        createdAt: "asc"
+      }
+    });
+
+    return connection ? mapProviderConnectionConfig(connection) : null;
+  }
+
   async getPrimaryConnection(): Promise<WhatsAppConnection | null> {
     const connection = await db.whatsAppConnection.findFirst({
       orderBy: {

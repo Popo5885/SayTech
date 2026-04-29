@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "turbo dev",
     "build": "turbo build",
+    "start": "npm --workspace @lottery/web run start",
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",
     "db:generate": "npm --workspace @lottery/db run generate",

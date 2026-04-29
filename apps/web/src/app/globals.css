@@ -7,6 +7,8 @@
   --foreground: #1c1917;
   --accent: #ea580c;
   --accent-strong: #c2410c;
+  --font-body: Assistant, Heebo, Arial, sans-serif;
+  --font-heading: Assistant, Heebo, Arial, sans-serif;
 }
 
 html {

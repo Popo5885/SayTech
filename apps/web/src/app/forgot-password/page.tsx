@@ -14,32 +14,47 @@ async function forgotPasswordAction(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
 
   if (!email) {
-    redirect("/forgot-password?sent=1");
+    redirect("/forgot-password?error=missing");
   }
 
   const user = await db.user.findUnique({ where: { email } });
 
-  if (user) {
-    const code = createVerificationCode();
-    await db.passwordResetToken.create({
-      data: {
-        userId: user.id,
-        codeHash: hashVerificationCode(code),
-        expiresAt: new Date(Date.now() + 15 * 60 * 1000)
-      }
-    });
-    await sendSystemEmail({
-      to: email,
-      subject: "קוד איפוס סיסמה ל-Magic Flow",
-      unsubscribeUrl: `${process.env.PUBLIC_BASE_URL ?? "http://localhost:3000"}/unsubscribe/${user.unsubscribeToken}`,
-      html: `<h1>קוד איפוס סיסמה</h1><p>הקוד שלך הוא:</p><p style="font-size:28px;font-weight:800;letter-spacing:4px" dir="ltr">${code}</p><p>הקוד תקף ל-15 דקות. לאחר אימות הקוד ייפתח מסך בחירת סיסמה חדשה.</p>`
-    });
+  if (!user) {
+    redirect("/forgot-password?sent=1");
+  }
+
+  const code = createVerificationCode();
+  await db.passwordResetToken.create({
+    data: {
+      userId: user.id,
+      codeHash: hashVerificationCode(code),
+      expiresAt: new Date(Date.now() + 15 * 60 * 1000)
+    }
+  });
+
+  const sent = await sendSystemEmail({
+    to: email,
+    subject: "קוד איפוס סיסמה ל-Magic Flow",
+    unsubscribeUrl: `${process.env.PUBLIC_BASE_URL ?? "http://localhost:3000"}/unsubscribe/${user.unsubscribeToken}`,
+    html: `<h1>קוד איפוס סיסמה</h1><p>הקוד שלך הוא:</p><p style="font-size:28px;font-weight:800;letter-spacing:4px" dir="ltr">${code}</p><p>הקוד תקף ל-15 דקות. לאחר אימות הקוד ייפתח מסך בחירת סיסמה חדשה.</p>`
+  });
+
+  if (!sent) {
+    redirect(`/forgot-password?error=email&email=${encodeURIComponent(email)}`);
   }
 
   redirect(`/reset-password?email=${encodeURIComponent(email)}`);
 }
 
-export default function ForgotPasswordPage() {
+export default async function ForgotPasswordPage({
+  searchParams
+}: {
+  searchParams?: Promise<{ error?: string; email?: string; sent?: string }>;
+}) {
+  const params = await searchParams;
+  const error = params?.error;
+  const sent = params?.sent === "1";
+
   return (
     <main className="aurora-surface relative flex min-h-screen items-center justify-center overflow-hidden bg-[#070914] px-4 py-10 text-white" dir="rtl">
       <div className="pointer-events-none absolute inset-0">
@@ -55,10 +70,27 @@ export default function ForgotPasswordPage() {
         <p className="mt-3 leading-7 text-slate-300">
           הכניסו את האימייל, נשלח קוד אימות, ורק אחרי אימות הקוד תיפתח אפשרות לבחור סיסמה חדשה.
         </p>
+
+        {error === "email" ? (
+          <div className="mt-5 rounded-2xl border border-amber-300/25 bg-amber-300/12 p-4 text-sm font-semibold text-amber-100">
+            מערכת המיילים עדיין לא מוגדרת בסביבה הזו. הגדירו `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS` ו-`SMTP_FROM` ואז נסו שוב.
+          </div>
+        ) : null}
+        {error === "missing" ? (
+          <div className="mt-5 rounded-2xl border border-red-300/25 bg-red-300/12 p-4 text-sm font-semibold text-red-100">
+            צריך להזין אימייל תקין.
+          </div>
+        ) : null}
+        {sent ? (
+          <div className="mt-5 rounded-2xl border border-emerald-300/25 bg-emerald-300/12 p-4 text-sm font-semibold text-emerald-100">
+            אם קיים חשבון עם האימייל הזה, נשלח אליו קוד אימות.
+          </div>
+        ) : null}
+
         <form action={forgotPasswordAction} className="mt-6 space-y-4">
           <label className="block">
             <span className="font-bold text-slate-200">אימייל</span>
-            <input className="mt-2 h-12 w-full rounded-2xl border border-white/10 bg-white/10 px-4 text-white outline-none transition focus:border-cyan-300 focus:shadow-[0_0_0_4px_rgba(34,211,238,0.12)]" dir="ltr" name="email" required type="email" />
+            <input className="mt-2 h-12 w-full rounded-2xl border border-white/10 bg-white/10 px-4 text-white outline-none transition focus:border-cyan-300 focus:shadow-[0_0_0_4px_rgba(34,211,238,0.12)]" defaultValue={params?.email ?? ""} dir="ltr" name="email" required type="email" />
           </label>
           <SuccessSubmitButton>שליחת קוד</SuccessSubmitButton>
         </form>
