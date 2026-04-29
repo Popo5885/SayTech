@@ -281,6 +281,19 @@ async function createConnectionAction(formData: FormData) {
     redirect("/admin");
   }
 
+  if (provider === "official_business" && !phoneNumber) {
+    redirect("/admin?error=connection-phone#connections");
+  }
+
+  if (
+    provider === "official_business" &&
+    (officialAccessToken || officialWebhookVerifyToken) &&
+    process.env.NODE_ENV === "production" &&
+    !process.env.WORKSPACE_TOKEN_ENCRYPTION_KEY
+  ) {
+    redirect("/admin?error=encryption-key#connections");
+  }
+
   await db.whatsAppConnection.create({
     data: {
       workspaceId,
@@ -299,6 +312,7 @@ async function createConnectionAction(formData: FormData) {
     }
   });
   revalidatePath("/admin");
+  redirect("/admin?saved=connection#connections");
 }
 
 async function createAutomationAction(formData: FormData) {
@@ -427,7 +441,12 @@ function textAreaClass() {
   return "min-h-28 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500";
 }
 
-export default async function AdminPage() {
+export default async function AdminPage({
+  searchParams
+}: {
+  searchParams?: Promise<{ error?: string; saved?: string }>;
+}) {
+  const params = await searchParams;
   const session = await auth();
 
   if (!session) {
@@ -482,6 +501,26 @@ export default async function AdminPage() {
           <p className="mt-3 text-slate-300">לקוחות, חיבורים, אוטומציות, ניוזלטרים, קבלות ותוכן האתר במקום אחד.</p>
           <p className="mt-5 text-sm text-slate-400">מייל מנהל: <span dir="ltr">{ownerEmail()}</span></p>
         </header>
+
+        {params?.error === "encryption-key" ? (
+          <div className="rounded-[28px] border border-amber-200 bg-amber-50 p-5 text-sm font-bold leading-7 text-amber-900">
+            כדי לשמור Access Token של WhatsApp Official צריך להגדיר ב-Railway את
+            <span className="mx-1 rounded-lg bg-white px-2 py-1" dir="ltr">WORKSPACE_TOKEN_ENCRYPTION_KEY</span>
+            ואז לנסות שוב. זה מונע שמירת טוקנים ללא הצפנה.
+          </div>
+        ) : null}
+
+        {params?.error === "connection-phone" ? (
+          <div className="rounded-[28px] border border-red-200 bg-red-50 p-5 text-sm font-bold leading-7 text-red-800">
+            כדי להוסיף חיבור WhatsApp צריך להזין מספר תקין בפורמט בינלאומי, למשל <span dir="ltr">+972501234567</span>.
+          </div>
+        ) : null}
+
+        {params?.saved === "connection" ? (
+          <div className="rounded-[28px] border border-emerald-200 bg-emerald-50 p-5 text-sm font-bold leading-7 text-emerald-900">
+            החיבור נשמר בהצלחה. אם זה חיבור רשמי, ודא שגם ה-Webhook של Meta מפנה לכתובת השרת.
+          </div>
+        ) : null}
 
         <section className="grid gap-4 md:grid-cols-4">
           <div className="rounded-[28px] bg-white p-6 shadow-sm">
@@ -646,7 +685,7 @@ export default async function AdminPage() {
         </section>
 
         <section className="grid gap-6 xl:grid-cols-2">
-          <div className="rounded-[32px] bg-white p-6 shadow-sm">
+          <div className="rounded-[32px] bg-white p-6 shadow-sm" id="connections">
             <h2 className="text-2xl font-black text-slate-950">חיבורי WhatsApp</h2>
             <div className="mt-4 rounded-3xl border border-emerald-100 bg-emerald-50 p-4 text-sm leading-6 text-emerald-950">
               <p className="font-black">איך מחברים נכון?</p>
@@ -654,7 +693,7 @@ export default async function AdminPage() {
                 חיבור רשמי: מזינים מספר בפורמט <span dir="ltr">+972...</span>, Phone Number ID, WABA ID ו-Access Token ממטא. הטוקן נשמר מוצפן במסד הנתונים.
               </p>
               <p className="mt-1">
-                חיבור ברקוד: מיועד לצוות בלבד. הלקוח לא רואה QR או Pairing Code; הוא מקבל חוויית Zero-Touch.
+                חיבור ברקוד: מיועד לצוות בלבד. הלקוח לא רואה QR או Pairing Code; הוא מקבל חוויית Zero-Touch. אם בוחרים חיבור ברקוד, מוסיפים מספר ושם חיבור, ואת פעולת הסריקה עושים מכלי הצוות.
               </p>
             </div>
             <form action={createConnectionAction} className="mt-5 grid gap-3 md:grid-cols-2">
