@@ -34,6 +34,7 @@ const MENU_MATCHERS = ["תפריט", "menu", "help", "אפשרויות"];
 const NEGATIVE_REFERRER_MATCHERS = ["אין", "לא", "none", "nobody"];
 const CONTACT_SAVED_YES_MATCHERS = ["שמרתי", "שמרתי!", "כן", "yes", "saved"];
 const CONTACT_SAVED_NO_MATCHERS = ["לא שמרתי", "לא", "no", "not saved"];
+const SKIP_EMAIL_MATCHERS = ["דלג", "לדלג", "skip", "אין מייל", "אין"];
 const db = prisma as any;
 
 function normalizePhoneCandidate(value: string): string | null {
@@ -88,6 +89,10 @@ function looksLikeInvalidName(value: string): boolean {
     normalized.length > 60 ||
     /(https?:\/\/|www\.|play\.google\.com|ref=|\/join\/)/i.test(normalized)
   );
+}
+
+function looksLikeEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }
 
 export class CampaignService {
@@ -156,6 +161,61 @@ export class CampaignService {
         }
 
         currentParticipant = await this.participantRepository.captureName(
+          currentParticipant.id,
+          message.body
+        );
+
+        if (campaign.collectEmail && this.isTemplateEnabled(campaign, "EMAIL_PROMPT")) {
+          currentParticipant = await this.participantRepository.markAwaitingEmail(
+            currentParticipant.id
+          );
+          await this.appendTemplateMessage(outbound, campaign, currentParticipant, "EMAIL_PROMPT");
+          break;
+        }
+
+        currentParticipant = await this.participantRepository.markAwaitingContactSave(
+          currentParticipant.id
+        );
+
+        if (!this.isTemplateEnabled(campaign, "SAVE_CONTACT_PROMPT")) {
+          await this.completeRegistrationFlow(
+            campaign,
+            currentParticipant,
+            outbound,
+            contactsToSync
+          );
+          break;
+        }
+
+        await this.appendSaveContactPrompt(outbound, campaign, currentParticipant);
+        break;
+
+      case "AWAITING_EMAIL":
+        if (matchesOneOf(message.body, SKIP_EMAIL_MATCHERS)) {
+          currentParticipant = await this.participantRepository.markAwaitingContactSave(
+            currentParticipant.id
+          );
+
+          if (!this.isTemplateEnabled(campaign, "SAVE_CONTACT_PROMPT")) {
+            await this.completeRegistrationFlow(
+              campaign,
+              currentParticipant,
+              outbound,
+              contactsToSync
+            );
+            break;
+          }
+
+          await this.appendSaveContactPrompt(outbound, campaign, currentParticipant);
+          break;
+        }
+
+        if (!looksLikeEmail(message.body)) {
+          await this.appendTemplateMessage(outbound, campaign, currentParticipant, "EMAIL_PROMPT");
+          break;
+        }
+
+        currentParticipant = await this.participantRepository.captureEmail(
           currentParticipant.id,
           message.body
         );
@@ -415,7 +475,9 @@ export class CampaignService {
         top10: buildTop10Summary(registeredParticipants),
         contact_phone: participant.phone,
         campaign_name: campaign.name,
-        ref: participant.referralToken
+        ref: participant.referralToken,
+        email: participant.email ?? "",
+        group_invite_link: campaign.groupInviteLink ?? ""
       }),
       mediaUrl: template?.mediaUrl ?? null,
       mediaType: template?.mediaType ?? null,
@@ -509,6 +571,11 @@ export class CampaignService {
     });
 
     await this.appendTemplateMessage(outbound, campaign, registeredParticipant, "LINK");
+
+    if (campaign.groupInviteLink && this.isTemplateEnabled(campaign, "GROUP_INVITE")) {
+      await this.appendTemplateMessage(outbound, campaign, registeredParticipant, "GROUP_INVITE");
+    }
+
     await this.appendTemplateMessage(outbound, campaign, registeredParticipant, "MAIN_MENU");
 
     if (registration.referrer) {

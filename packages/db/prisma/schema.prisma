@@ -80,6 +80,7 @@ enum MediaType {
 
 enum ParticipantOnboardingState {
   AWAITING_NAME
+  AWAITING_EMAIL
   AWAITING_REFERRER
   AWAITING_STATUS_PROOF
   AWAITING_CONTACT_SAVED
@@ -94,11 +95,13 @@ enum TemplateInteractiveType {
 
 enum MessageTemplateType {
   WELCOME
+  EMAIL_PROMPT
   REFERRER_PROMPT
   SAVE_CONTACT_PROMPT
   REGISTRATION_PAUSED
   MAIN_MENU
   LINK
+  GROUP_INVITE
   JOIN_WHATSAPP_PROMPT
   STATUS
   WINNER
@@ -186,6 +189,7 @@ model Workspace {
   contactBotExtraQuota        Int                  @default(0)
   contactBotUsedQuota         Int                  @default(0)
   contactBotMonthlyPriceCents Int                  @default(5000)
+  enabledModules              String[]             @default(["core"])
   numberPoolStatus            WorkspaceNumberPoolStatus @default(waiting)
   onboardingTourStep          Int                  @default(0)
   onboardingTourCompletedAt   DateTime?
@@ -248,6 +252,8 @@ model Campaign {
   googleContactGroupResourceName String?
   statusCommandAliases String[]
   isActive             Boolean             @default(true)
+  collectEmail         Boolean             @default(false)
+  groupInviteLink      String?
   messageCount         Int                 @default(0)
   createdAt            DateTime            @default(now())
   updatedAt            DateTime            @updatedAt
@@ -277,6 +283,7 @@ model Participant {
   contactSavedConfirmed Boolean                   @default(true)
   statusProofReceived  Boolean                    @default(false)
   statusProofMediaUrl  String?                    @db.Text
+  email                String?
   pendingReferralCode  String?
   pendingReferrerPhone String?
   tickets              Int                        @default(1)

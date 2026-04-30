@@ -81,6 +81,7 @@ function mapWorkspace(record: any): Workspace {
     contactBotExtraQuota: record.contactBotExtraQuota ?? 0,
     contactBotUsedQuota: record.contactBotUsedQuota ?? 0,
     contactBotMonthlyPriceCents: record.contactBotMonthlyPriceCents ?? 5000,
+    enabledModules: record.enabledModules ?? ["core"],
     numberPoolStatus: record.numberPoolStatus ?? "waiting",
     onboardingTourStep: record.onboardingTourStep ?? 0,
     onboardingTourCompletedAt: record.onboardingTourCompletedAt
@@ -155,6 +156,8 @@ function mapCampaign(record: any): Campaign {
     googleContactGroupResourceName: record.googleContactGroupResourceName ?? null,
     statusCommandAliases: record.statusCommandAliases ?? [],
     isActive: record.isActive,
+    collectEmail: record.collectEmail ?? false,
+    groupInviteLink: record.groupInviteLink ?? null,
     messageCount: record.messageCount ?? 0,
     createdAt: record.createdAt.toISOString(),
     templates: Array.isArray(record.templates) ? record.templates.map(mapTemplate) : []
@@ -174,6 +177,7 @@ function mapParticipant(record: any): Participant {
     tickets: record.tickets ?? 1,
     joinedAt: record.createdAt.toISOString(),
     referredByParticipantId: record.referrerId ?? null,
+    email: record.email ?? null,
     onboardingState: record.onboardingState ?? "REGISTERED",
     contactSavedConfirmed: record.contactSavedConfirmed ?? true,
     statusProofReceived: record.statusProofReceived ?? false,
@@ -767,6 +771,33 @@ export class ParticipantRepository {
       },
       data: {
         name: name.trim(),
+        onboardingState: "AWAITING_REFERRER"
+      }
+    });
+
+    return mapParticipant(participant);
+  }
+
+  async markAwaitingEmail(participantId: string): Promise<Participant> {
+    const participant = await db.participant.update({
+      where: {
+        id: participantId
+      },
+      data: {
+        onboardingState: "AWAITING_EMAIL"
+      }
+    });
+
+    return mapParticipant(participant);
+  }
+
+  async captureEmail(participantId: string, email: string): Promise<Participant> {
+    const participant = await db.participant.update({
+      where: {
+        id: participantId
+      },
+      data: {
+        email: email.trim().toLowerCase(),
         onboardingState: "AWAITING_REFERRER"
       }
     });
@@ -1425,7 +1456,9 @@ export class CampaignRepository {
       top10: "",
       contact_phone: winner.participantPhone,
       campaign_name: campaign.name,
-      ref: ""
+      ref: "",
+      email: "",
+      group_invite_link: campaign.groupInviteLink ?? ""
     });
   }
 }

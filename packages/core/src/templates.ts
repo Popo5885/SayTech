@@ -12,11 +12,13 @@ const VARIABLE_PATTERN = /\{\{\s*([a-z_]+)\s*\}\}/g;
 
 const labelByKey: Record<MessageTemplateKey, string> = {
   WELCOME: "הודעת פתיחה ובקשת שם",
+  EMAIL_PROMPT: "בקשת כתובת אימייל",
   REFERRER_PROMPT: "שאלת מפנה ידנית",
   SAVE_CONTACT_PROMPT: "בקשת שמירת איש קשר",
   REGISTRATION_PAUSED: "הודעת עצירה",
   MAIN_MENU: "תפריט למשתתף חוזר",
   LINK: "שליחת קישור אישי",
+  GROUP_INVITE: "הזמנה לקבוצה",
   JOIN_WHATSAPP_PROMPT: "טקסט פתיחת WhatsApp מהקישור",
   STATUS_TICKETS: "בדיקת כרטיסים",
   WINNER: "הודעת זכייה",
@@ -28,6 +30,8 @@ const labelByKey: Record<MessageTemplateKey, string> = {
 const defaultByKey: Record<MessageTemplateKey, string> = {
   WELCOME:
     "שלום {{name}}, ברוכים הבאים ל{{campaign_name}}.\nכדי להשלים הרשמה, נבקש לשמור את איש הקשר שלנו ואז תקבלו קישור אישי לשיתוף.",
+  EMAIL_PROMPT:
+    "מעולה {{name}}!\nכדי שנוכל לעדכן אותך על זכיות ומבצעים, שלח/י לנו את כתובת המייל שלך.",
   REFERRER_PROMPT:
     "מי הזמין אותך להגרלה?\nאפשר לשלוח שם או מספר טלפון. אם אף אחד לא הזמין אותך, כתבו: אין.",
   SAVE_CONTACT_PROMPT:
@@ -37,6 +41,8 @@ const defaultByKey: Record<MessageTemplateKey, string> = {
   MAIN_MENU: "מה תרצו לעשות עכשיו?",
   LINK:
     "מעולה {{name}}, ההרשמה הושלמה.\nזה הקישור האישי שלך לשיתוף:\n{{link}}\n\nכל מי שמצטרף דרך הקישור שלך מוסיף לך כרטיסים.",
+  GROUP_INVITE:
+    "איזה כיף שהצטרפת {{name}}! 🎉\nלחצ/י על הקישור הבא כדי להיכנס לקבוצת ה-VIP שלנו:\n{{group_invite_link}}",
   JOIN_WHATSAPP_PROMPT:
     "היי, אשמח להצטרף ל{{campaign_name}}. הגעתי דרך {{ref}}.",
   STATUS_TICKETS:
@@ -85,15 +91,19 @@ const interactiveDefaults: Partial<Record<MessageTemplateKey, TemplateInteractiv
 };
 
 const defaultEnabledByKey: Partial<Record<MessageTemplateKey, boolean>> = {
-  REFERRER_PROMPT: false
+  EMAIL_PROMPT: false,
+  REFERRER_PROMPT: false,
+  GROUP_INVITE: false
 };
 
 export const TEMPLATE_EDITOR_ORDER: MessageTemplateKey[] = [
   "WELCOME",
+  "EMAIL_PROMPT",
   "SAVE_CONTACT_PROMPT",
   "REGISTRATION_PAUSED",
   "MAIN_MENU",
   "LINK",
+  "GROUP_INVITE",
   "JOIN_WHATSAPP_PROMPT",
   "STATUS_TICKETS",
   "WINNER",
@@ -108,6 +118,8 @@ export function getTemplateDescription(key: MessageTemplateKey): string {
   switch (key) {
     case "WELCOME":
       return "ההודעה הראשונה שהמשתתף מקבל אחרי שהבוט מזהה אותו.";
+    case "EMAIL_PROMPT":
+      return "בקשה למשתתף לשלוח כתובת מייל לעדכונים על זכיות ומבצעים.";
     case "REFERRER_PROMPT":
       return "שאלה ידנית למקרה שאין קוד מפנה בקישור.";
     case "SAVE_CONTACT_PROMPT":
@@ -118,6 +130,8 @@ export function getTemplateDescription(key: MessageTemplateKey): string {
       return "תפריט קצר למשתתפים שחוזרים לבוט.";
     case "LINK":
       return "הודעת הסיום עם הקישור האישי לשיתוף.";
+    case "GROUP_INVITE":
+      return "הזמנה אוטומטית לקבוצת VIP/WhatsApp אחרי השלמת הרשמה.";
     case "JOIN_WHATSAPP_PROMPT":
       return "הטקסט שנפתח אוטומטית ב-WhatsApp מתוך קישור ההצטרפות.";
     case "STATUS_TICKETS":
@@ -212,6 +226,8 @@ export function buildTemplatePreviewContext(
     contact_phone: "+972501234567",
     campaign_name: "שם ההגרלה שלך",
     ref: "AB12CD34",
+    email: "user@example.com",
+    group_invite_link: "https://chat.whatsapp.com/example",
     ...overrides
   };
 }

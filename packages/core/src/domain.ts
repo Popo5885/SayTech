@@ -12,11 +12,13 @@ export type CampaignMode = "REFERRAL" | "TRIGGER_JOIN";
 
 export type MessageTemplateKey =
   | "WELCOME"
+  | "EMAIL_PROMPT"
   | "REFERRER_PROMPT"
   | "SAVE_CONTACT_PROMPT"
   | "REGISTRATION_PAUSED"
   | "MAIN_MENU"
   | "LINK"
+  | "GROUP_INVITE"
   | "JOIN_WHATSAPP_PROMPT"
   | "STATUS_TICKETS"
   | "WINNER"
@@ -28,6 +30,7 @@ export type MediaType = "IMAGE" | "VIDEO";
 
 export type ParticipantOnboardingState =
   | "AWAITING_NAME"
+  | "AWAITING_EMAIL"
   | "AWAITING_REFERRER"
   | "AWAITING_STATUS_PROOF"
   | "AWAITING_CONTACT_SAVED"
@@ -77,6 +80,7 @@ export interface Workspace {
   contactBotExtraQuota?: number;
   contactBotUsedQuota?: number;
   contactBotMonthlyPriceCents?: number;
+  enabledModules?: string[];
   numberPoolStatus?: "waiting" | "assigned";
   onboardingTourStep?: number;
   onboardingTourCompletedAt?: string | null;
@@ -141,6 +145,8 @@ export interface Campaign {
   googleContactGroupResourceName: string | null;
   statusCommandAliases: string[];
   isActive: boolean;
+  collectEmail: boolean;
+  groupInviteLink: string | null;
   messageCount: number;
   createdAt: string;
   templates: CampaignMessageTemplate[];
@@ -158,6 +164,7 @@ export interface Participant {
   tickets: number;
   joinedAt: string;
   referredByParticipantId: string | null;
+  email: string | null;
   onboardingState: ParticipantOnboardingState;
   contactSavedConfirmed: boolean;
   statusProofReceived?: boolean;
@@ -266,6 +273,8 @@ export interface TemplatePreviewContext {
   contact_phone: string;
   campaign_name: string;
   ref: string;
+  email: string;
+  group_invite_link: string;
 }
 
 export interface IncomingWhatsAppMessage {
@@ -322,5 +331,7 @@ export const SUPPORTED_TEMPLATE_VARIABLES = [
   "top10",
   "contact_phone",
   "campaign_name",
-  "ref"
+  "ref",
+  "email",
+  "group_invite_link"
 ] as const;
