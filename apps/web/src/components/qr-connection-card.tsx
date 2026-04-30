@@ -185,19 +185,16 @@ export function QrConnectionCard({
     setActionMessage(null);
 
     try {
-      const response = await fetch(`/api/connections/${snapshot.connectionId}/connect`, {
-        method: "POST"
-      });
-      const data = (await response.json()) as Partial<ConnectionSnapshot> & { error?: string };
+      const nextSnapshot = await fetchConnectionSnapshot(snapshot.connectionId);
 
-      if (!response.ok) {
-        throw new Error(data.error ?? "החיבור מתבצע רק דרך שירות החיבור הפעיל.");
+      if (!nextSnapshot) {
+        throw new Error("לא הצלחנו לקרוא את סטטוס החיבור. בדוק שהשרת וה-Worker פעילים.");
       }
 
-      startTransition(() => setSnapshot((current) => ({ ...current, ...data })));
-      setActionMessage("נשלחה בקשה להפיק קוד חדש.");
+      startTransition(() => setSnapshot(nextSnapshot));
+      setActionMessage("סטטוס החיבור נבדק מחדש. אם ה-Worker פעיל ומפיק QR, הוא יופיע כאן אוטומטית.");
     } catch (error) {
-      setActionMessage(error instanceof Error ? error.message : "לא הצלחנו לרענן את החיבור.");
+      setActionMessage(error instanceof Error ? error.message : "לא הצלחנו לרענן את סטטוס החיבור.");
     } finally {
       setIsRequesting(false);
     }
@@ -371,7 +368,7 @@ export function QrConnectionCard({
             variant="secondary"
           >
             <RefreshCw className="ml-2 h-4 w-4" />
-            רענן קוד
+            בדוק שוב
           </Button>
           <button
             className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-emerald-300 bg-white px-4 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50"

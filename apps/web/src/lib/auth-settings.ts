@@ -1,4 +1,5 @@
 import { prisma } from "@lottery/db";
+import { getGoogleOAuthSettings } from "./google-settings";
 
 const db = prisma as any;
 
@@ -26,15 +27,8 @@ function parseBoolean(value: string | null | undefined): boolean | null {
   return null;
 }
 
-function googleClientId(): string {
-  return (
-    process.env.GOOGLE_CLIENT_ID ??
-    "455116448878-mlsaq4mflpdm8fpkisnak26tjhmtduf3.apps.googleusercontent.com"
-  );
-}
-
-export function isGoogleOAuthConfigured(): boolean {
-  return Boolean(googleClientId() && process.env.GOOGLE_CLIENT_SECRET);
+export async function isGoogleOAuthConfigured(): Promise<boolean> {
+  return (await getGoogleOAuthSettings()).configured;
 }
 
 export function isEnvWhatsAppSenderConfigured(): boolean {
@@ -120,7 +114,7 @@ export async function getAuthFeatureSettings() {
     parseBoolean(settings.get(AUTH_SETTING_KEYS.whatsappManualCodeEnabled)) ??
     parseBoolean(process.env.AUTH_WHATSAPP_MANUAL_CODE_ENABLED) ??
     true;
-  const googleConfigured = isGoogleOAuthConfigured();
+  const googleConfigured = await isGoogleOAuthConfigured();
   const whatsappSenderConfigured = await hasOfficialWhatsAppSender();
 
   return {

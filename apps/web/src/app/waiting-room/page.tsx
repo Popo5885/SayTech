@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Clock, Headphones, MailCheck, ShieldCheck } from "lucide-react";
+import { Clock, Headphones, LockKeyhole, MailCheck, ShieldCheck } from "lucide-react";
 import { auth } from "../../auth";
 import { ownerEmail } from "../../lib/email";
 
@@ -23,8 +23,11 @@ export default async function WaitingRoomPage() {
   }
 
   const name = session.user.name ?? "לקוח יקר";
+  const isSuspended = user.accountStatus === "suspended";
   const supportHref = `https://wa.me/${supportPhone}?text=${encodeURIComponent(
-    "שלום צוות Magic Flow, אשמח לבדוק את סטטוס החשבון שלי."
+    isSuspended
+      ? "שלום צוות Magic Flow, החשבון שלי נעול ואשמח לפתוח אותו."
+      : "שלום צוות Magic Flow, אשמח לבדוק את סטטוס החשבון שלי."
   )}`;
 
   return (
@@ -36,35 +39,52 @@ export default async function WaitingRoomPage() {
       </div>
 
       <section className="border-beam-card relative w-full max-w-2xl rounded-[36px] border border-white/10 bg-white/[0.08] p-8 text-center shadow-2xl backdrop-blur-xl">
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-amber-300/15 text-amber-200 ring-1 ring-amber-200/20">
-          <Clock className="h-8 w-8" />
+        <div className={`mx-auto flex h-16 w-16 items-center justify-center rounded-3xl ring-1 ${
+          isSuspended
+            ? "bg-red-300/15 text-red-100 ring-red-200/20"
+            : "bg-amber-300/15 text-amber-200 ring-amber-200/20"
+        }`}>
+          {isSuspended ? <LockKeyhole className="h-8 w-8" /> : <Clock className="h-8 w-8" />}
         </div>
-        <p className="mt-5 text-sm font-black text-cyan-100">כניסה מבוקרת</p>
+        <p className="mt-5 text-sm font-black text-cyan-100">{isSuspended ? "החשבון נעול" : "כניסה מבוקרת"}</p>
         <h1 className="mt-3 text-4xl font-black tracking-tight md:text-5xl">
-          החשבון בבדיקה קצרה
+          {isSuspended ? "המשתמש נעול" : "החשבון בבדיקה קצרה"}
         </h1>
         <p className="mt-5 text-lg leading-9 text-slate-200">
-          שלום {name}, קיבלנו את פרטיך. כדי לשמור על איכות המערכת והעבודה מול WhatsApp Official,
-          כל חשבון עובר בדיקה ידנית. נשלח לך מייל ברגע שהכל יהיה מוכן עבורך.
+          {isSuspended ? (
+            <>
+              שלום {name}, החשבון שלך נעול כרגע ולכן אי אפשר להיכנס למערכת. יש לפנות לתמיכה של Magic Flow לפתיחה מחדש.
+              <span className="mt-3 block text-2xl font-black" dir="ltr">054-246-6340</span>
+            </>
+          ) : (
+            <>
+              שלום {name}, קיבלנו את פרטיך. כדי לשמור על איכות המערכת והעבודה מול WhatsApp Official,
+              כל חשבון עובר בדיקה ידנית. נשלח לך מייל ברגע שהכל יהיה מוכן עבורך.
+            </>
+          )}
         </p>
 
         <div className="mt-7 grid gap-3 text-right md:grid-cols-2">
           <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-5 text-sm leading-7 text-slate-300">
             <div className="flex items-center gap-2 font-black text-white">
-              <ShieldCheck className="h-5 w-5 text-emerald-300" />
-              בדיקת איכות
+              {isSuspended ? <LockKeyhole className="h-5 w-5 text-red-200" /> : <ShieldCheck className="h-5 w-5 text-emerald-300" />}
+              {isSuspended ? "כניסה חסומה" : "בדיקת איכות"}
             </div>
             <p className="mt-2">
-              צוות Magic Flow בודק שהחשבון מתאים לעבודה יציבה ובטוחה מול התשתית הרשמית.
+              {isSuspended
+                ? "כל עוד החשבון נעול, לא ניתן להיכנס עם מייל, Google או WhatsApp."
+                : "צוות Magic Flow בודק שהחשבון מתאים לעבודה יציבה ובטוחה מול התשתית הרשמית."}
             </p>
           </div>
           <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-5 text-sm leading-7 text-slate-300">
             <div className="flex items-center gap-2 font-black text-white">
               <MailCheck className="h-5 w-5 text-cyan-300" />
-              עדכון במייל
+              {isSuspended ? "תמיכה" : "עדכון במייל"}
             </div>
             <p className="mt-2">
-              לאחר האישור תקבל מייל, והכניסה הבאה תוביל אותך ישר ללוח העבודה.
+              {isSuspended
+                ? "להסרת נעילה יש לפנות לתמיכה במספר 054-246-6340."
+                : "לאחר האישור תקבל מייל, והכניסה הבאה תוביל אותך ישר ללוח העבודה."}
             </p>
           </div>
         </div>

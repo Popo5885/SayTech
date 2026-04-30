@@ -4,21 +4,19 @@ import Google from "next-auth/providers/google";
 import { createHash } from "node:crypto";
 import { WorkspaceRepository } from "@lottery/core";
 import { prisma } from "@lottery/db";
-import { isGoogleOAuthConfigured, isWhatsAppLoginEnabled } from "./lib/auth-settings";
+import type { NextAuthConfig } from "next-auth";
+import { isWhatsAppLoginEnabled } from "./lib/auth-settings";
+import { getGoogleOAuthSettings } from "./lib/google-settings";
 import { normalizeIsraeliPhone } from "./lib/phone";
 import { hashPassword, hashVerificationCode, verifyPassword } from "./lib/password";
 
-const DEFAULT_GOOGLE_CLIENT_ID =
-  "455116448878-mlsaq4mflpdm8fpkisnak26tjhmtduf3.apps.googleusercontent.com";
 const SYSTEM_ADMIN_EMAIL = (process.env.SUPERADMIN_EMAIL ?? "aknvpupuch@gmail.com").toLowerCase();
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID ?? DEFAULT_GOOGLE_CLIENT_ID;
-const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET ?? "";
 
 const db = prisma as any;
 const workspaceRepository = new WorkspaceRepository();
 
-export function isGoogleAuthConfigured() {
-  return isGoogleOAuthConfigured();
+export async function isGoogleAuthConfigured() {
+  return (await getGoogleOAuthSettings()).configured;
 }
 
 function resolveAuthSecret() {
@@ -71,17 +69,20 @@ async function createInitialAdminUser(email: string, password: string) {
   });
 }
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
-  trustHost: true,
-  secret: resolveAuthSecret(),
-  pages: {
-    signIn: "/login",
-    error: "/login"
-  },
-  session: {
-    strategy: "jwt"
-  },
-  providers: [
+async function buildAuthConfig(): Promise<NextAuthConfig> {
+  const googleSettings = await getGoogleOAuthSettings();
+
+  return {
+    trustHost: true,
+    secret: resolveAuthSecret(),
+    pages: {
+      signIn: "/login",
+      error: "/login"
+    },
+    session: {
+      strategy: "jwt"
+    },
+    providers: [
     Credentials({
       name: "כניסה עם מייל וסיסמה",
       credentials: {
@@ -193,11 +194,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         } as any;
       }
     }),
-    ...(isGoogleAuthConfigured()
+    ...(googleSettings.configured
       ? [
           Google({
-            clientId: GOOGLE_CLIENT_ID,
-            clientSecret: GOOGLE_CLIENT_SECRET,
+            clientId: googleSettings.clientId,
+            clientSecret: googleSettings.clientSecret,
             authorization: {
               params: {
                 access_type: "offline",
@@ -210,8 +211,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           })
         ]
       : [])
-  ],
-  callbacks: {
+    ],
+    callbacks: {
     async signIn({ user, account }) {
       if (
         account?.provider === "google" &&
@@ -297,5 +298,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
       return session;
     }
-  }
-});
+    }
+  };
+}
+
+export const { handlers, auth, signIn, signOut } = NextAuth(async () => buildAuthConfig());

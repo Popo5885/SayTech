@@ -7,6 +7,7 @@ import { auth } from "../../auth";
 import { AUTH_SETTING_KEYS, getAuthFeatureSettings, setAuthFeatureSetting } from "../../lib/auth-settings";
 import { ownerEmail, sendSystemEmail } from "../../lib/email";
 import { getSmtpAdminSettings, saveSmtpSettings } from "../../lib/email-settings";
+import { DEFAULT_GOOGLE_CLIENT_ID, getGoogleOAuthAdminSettings, saveGoogleOAuthSettings } from "../../lib/google-settings";
 import { createVerificationCode, hashPassword, hashVerificationCode, isEnglishPassword } from "../../lib/password";
 import { normalizeIsraeliPhone } from "../../lib/phone";
 import { provisionWorkspaceForUser } from "../../lib/provisioning";
@@ -163,6 +164,7 @@ async function suspendUserAction(formData: FormData) {
     data: { actorUserId: (await auth())?.user?.id, action: "CUSTOMER_SUSPENDED", targetType: "User", targetId: user.id }
   });
   revalidatePath("/admin");
+  redirect("/admin?saved=user-suspended#customers");
 }
 
 async function activateUserAction(formData: FormData) {
@@ -181,6 +183,7 @@ async function activateUserAction(formData: FormData) {
   });
   await provisionWorkspaceForUser(user.id);
   revalidatePath("/admin");
+  redirect("/admin?saved=user-activated#customers");
 }
 
 async function changeUserPasswordAction(formData: FormData) {
@@ -339,6 +342,34 @@ async function viewWorkspaceAction(formData: FormData) {
     }
   });
   redirect("/dashboard");
+}
+
+async function viewWorkspaceConnectionsAction(formData: FormData) {
+  "use server";
+
+  await requireAdminUser();
+  const workspaceId = String(formData.get("workspaceId") ?? "");
+  const workspace = await db.workspace.findUnique({ where: { id: workspaceId } });
+
+  if (!workspace) {
+    redirect("/admin");
+  }
+
+  (await cookies()).set("admin_workspace_id", workspaceId, {
+    httpOnly: true,
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 4
+  });
+  await db.adminAuditLog.create({
+    data: {
+      actorUserId: (await auth())?.user?.id,
+      action: "ADMIN_VIEW_WORKSPACE_CONNECTIONS",
+      targetType: "Workspace",
+      targetId: workspaceId
+    }
+  });
+  redirect("/dashboard/connections");
 }
 
 async function createConnectionAction(formData: FormData) {
@@ -548,6 +579,44 @@ async function saveAuthSettingsAction(formData: FormData) {
   redirect(`/admin?saved=auth${missing.length ? `&missing=${missing.join(",")}` : ""}#auth-settings`);
 }
 
+async function saveGoogleOAuthSettingsAction(formData: FormData) {
+  "use server";
+
+  const admin = await requireAdminUser();
+  const clientId = String(formData.get("googleClientId") ?? "").trim() || DEFAULT_GOOGLE_CLIENT_ID;
+  const clientSecret = String(formData.get("googleClientSecret") ?? "").trim();
+  const redirectUri = String(formData.get("googleRedirectUri") ?? "").trim();
+
+  if (!clientId) {
+    redirect("/admin?error=google-oauth#auth-settings");
+  }
+
+  try {
+    await saveGoogleOAuthSettings({ clientId, clientSecret, redirectUri }, admin.id);
+  } catch (error) {
+    console.error("[admin:google-oauth-settings-failed]", error);
+    redirect("/admin?error=google-oauth#auth-settings");
+  }
+
+  await db.adminAuditLog.create({
+    data: {
+      actorUserId: admin.id,
+      action: "GOOGLE_OAUTH_SETTINGS_UPDATED",
+      targetType: "SiteSetting",
+      metadata: {
+        clientId,
+        redirectUri,
+        secretUpdated: Boolean(clientSecret)
+      }
+    }
+  });
+
+  revalidatePath("/admin");
+  revalidatePath("/login");
+  revalidatePath("/register");
+  redirect("/admin?saved=google-oauth#auth-settings");
+}
+
 async function saveSmtpSettingsAction(formData: FormData) {
   "use server";
 
@@ -729,7 +798,7 @@ export default async function AdminPage({
     db.user.count({ where: { accountStatus: "active" } }),
     db.user.findMany({ orderBy: { createdAt: "desc" }, take: 100 }),
     db.workspace.findMany({ orderBy: { createdAt: "desc" }, take: 100 }),
-    db.whatsAppConnection.findMany({ orderBy: { updatedAt: "desc" }, take: 50 }),
+    db.whatsAppConnection.findMany({ orderBy: { updatedAt: "desc" }, take: 50, include: { workspace: true } }),
     db.automationRule.findMany({ orderBy: { createdAt: "desc" }, take: 20, include: { workspace: true } }),
     db.emailBroadcast.findMany({ orderBy: { createdAt: "desc" }, take: 10 }),
     db.billingRecord.findMany({ orderBy: { createdAt: "desc" }, take: 20, include: { workspace: true } }),
@@ -745,6 +814,7 @@ export default async function AdminPage({
     siteSettings.map((setting: any) => [setting.key, String(setting.value)] as [string, string])
   );
   const authSettings = await getAuthFeatureSettings();
+  const googleOAuthSettings = await getGoogleOAuthAdminSettings();
   const smtpSettings = await getSmtpAdminSettings();
   const missingCodes = new Set((params?.missing ?? "").split(",").filter(Boolean));
   const operationalChecks = [
@@ -762,7 +832,7 @@ export default async function AdminPage({
           ? "מוגדר וכבוי"
           : "חסר Client Secret",
       ok: authSettings.googleLoginEnabled,
-      note: "נדרש GOOGLE_CLIENT_SECRET וגם הפעלה בממשק הניהול כדי לאפשר כניסה והרשמה עם Google."
+      note: "נדרש Google Client Secret. אפשר להגדיר אותו באזור Google OAuth בממשק או דרך סביבת השרת."
     },
     {
       label: "WhatsApp Login",
@@ -877,6 +947,18 @@ export default async function AdminPage({
           </div>
         ) : null}
 
+        {params?.saved === "user-suspended" ? (
+          <div className="rounded-[28px] border border-amber-200 bg-amber-50 p-5 text-sm font-bold leading-7 text-amber-900">
+            המשתמש ננעל. בכניסה הבאה יוצג לו שהחשבון נעול ושעליו לפנות לתמיכה.
+          </div>
+        ) : null}
+
+        {params?.saved === "user-activated" ? (
+          <div className="rounded-[28px] border border-emerald-200 bg-emerald-50 p-5 text-sm font-bold leading-7 text-emerald-900">
+            המשתמש הופעל ושוחרר לכניסה למערכת.
+          </div>
+        ) : null}
+
         {params?.saved === "auth" ? (
           <div className={`rounded-[28px] border p-5 text-sm font-bold leading-7 ${
             missingCodes.has("google-secret") || missingCodes.has("whatsapp-sender")
@@ -885,11 +967,23 @@ export default async function AdminPage({
           }`}>
             הגדרות הכניסה נשמרו.
             {missingCodes.has("google-secret") ? (
-              <span className="block">כדי ש-Google יופיע ללקוחות צריך להגדיר בשרת את <span dir="ltr">GOOGLE_CLIENT_SECRET</span> ואז להפעיל מחדש.</span>
+              <span className="block">כדי ש-Google יופיע ללקוחות צריך למלא Google Client Secret באזור Google OAuth כאן בממשק, או להגדיר <span dir="ltr">GOOGLE_CLIENT_SECRET</span> בשרת.</span>
             ) : null}
             {missingCodes.has("whatsapp-sender") ? (
               <span className="block">כדי לשלוח קודי WhatsApp אוטומטית צריך לחבר שולח WhatsApp Official או להפעיל קוד ידני מהממשק.</span>
             ) : null}
+          </div>
+        ) : null}
+
+        {params?.saved === "google-oauth" ? (
+          <div className="rounded-[28px] border border-emerald-200 bg-emerald-50 p-5 text-sm font-bold leading-7 text-emerald-900">
+            הגדרות Google OAuth נשמרו. אם הפעלת Google בהגדרות הכניסה ויש Client Secret תקין, הכפתור יופיע ללקוחות.
+          </div>
+        ) : null}
+
+        {params?.error === "google-oauth" ? (
+          <div className="rounded-[28px] border border-red-200 bg-red-50 p-5 text-sm font-bold leading-7 text-red-800">
+            לא ניתן לשמור את Google OAuth. מלא Client ID תקין. אם שומרים Secret בפרודקשן, נדרש גם WORKSPACE_TOKEN_ENCRYPTION_KEY.
           </div>
         ) : null}
 
@@ -963,11 +1057,11 @@ export default async function AdminPage({
           </div>
         </section>
 
-        <section className="grid gap-6 xl:grid-cols-2" id="auth-settings">
+        <section className="grid gap-6 xl:grid-cols-3" id="auth-settings">
           <div className="rounded-[32px] border border-emerald-100 bg-white p-6 shadow-sm">
             <h2 className="text-2xl font-black text-slate-950">הגדרות כניסה</h2>
             <p className="mt-2 text-sm leading-6 text-slate-500">
-              כאן מפעילים או מכבים כניסה עם Google ו-WhatsApp. Google יופיע ללקוחות רק אם קיים GOOGLE_CLIENT_SECRET בסביבת השרת.
+              כאן מפעילים או מכבים כניסה עם Google ו-WhatsApp. Google יופיע ללקוחות רק אחרי שמוגדר Client Secret בשרת או בממשק.
             </p>
             <div className="mt-5 grid gap-3 md:grid-cols-2">
               <div className={`rounded-2xl border p-4 ${
@@ -1011,10 +1105,10 @@ export default async function AdminPage({
                   name="googleLoginEnabled"
                   type="checkbox"
                 />
-                <span>
-                  הפעל כניסה והרשמה עם Google
-                  <span className="mt-1 block text-xs font-semibold text-slate-500">
-                    סטטוס סביבה: {authSettings.googleConfigured ? "GOOGLE_CLIENT_SECRET מוגדר" : "חסר GOOGLE_CLIENT_SECRET"}
+                  <span>
+                    הפעל כניסה והרשמה עם Google
+                    <span className="mt-1 block text-xs font-semibold text-slate-500">
+                    סטטוס Google OAuth: {authSettings.googleConfigured ? "מוגדר" : "חסר Client Secret"}
                   </span>
                 </span>
               </label>
@@ -1048,6 +1142,41 @@ export default async function AdminPage({
               </label>
               <button className="h-11 rounded-2xl bg-gradient-to-l from-emerald-500 to-cyan-500 px-5 font-black text-slate-950 shadow-[0_14px_35px_rgba(20,184,166,0.22)] transition hover:-translate-y-0.5" type="submit">
                 שמור הגדרות כניסה
+              </button>
+            </form>
+          </div>
+
+          <div className="rounded-[32px] border border-violet-100 bg-white p-6 shadow-sm">
+            <h2 className="text-2xl font-black text-slate-950">Google OAuth</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+              מלא כאן את פרטי Google כדי להפעיל Login והרשמה עם Google וגם חיבור Google Contacts.
+            </p>
+            <div className={`mt-4 rounded-2xl border p-4 text-sm font-bold leading-6 ${
+              googleOAuthSettings.configured
+                ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                : "border-amber-200 bg-amber-50 text-amber-900"
+            }`}>
+              {googleOAuthSettings.configured ? "Google OAuth מוגדר." : `חסר: ${googleOAuthSettings.missing.join(", ")}`}
+              <span className="mt-1 block text-xs">מקור Client ID: {googleOAuthSettings.source.clientId} · מקור Secret: {googleOAuthSettings.source.clientSecret}</span>
+            </div>
+            <form action={saveGoogleOAuthSettingsAction} className="mt-5 space-y-3">
+              <Field label="Google Client ID">
+                <input className={inputClass()} defaultValue={googleOAuthSettings.clientId} dir="ltr" name="googleClientId" required />
+              </Field>
+              <Field label="Google Client Secret">
+                <input
+                  className={inputClass()}
+                  dir="ltr"
+                  name="googleClientSecret"
+                  placeholder={googleOAuthSettings.secretConfigured ? "השאר ריק כדי לא לשנות" : "חובה להפעלת Google"}
+                  type="password"
+                />
+              </Field>
+              <Field label="Redirect URI">
+                <input className={inputClass()} defaultValue={googleOAuthSettings.redirectUri} dir="ltr" name="googleRedirectUri" />
+              </Field>
+              <button className="h-11 w-full rounded-2xl bg-violet-600 px-5 font-black text-white transition hover:-translate-y-0.5" type="submit">
+                שמור Google OAuth
               </button>
             </form>
           </div>
@@ -1188,7 +1317,12 @@ export default async function AdminPage({
                       {user.accountStatus === "active" ? (
                         <form action={suspendUserAction}>
                           <input name="userId" type="hidden" value={user.id} />
-                          <button className="h-10 rounded-2xl border border-amber-200 px-4 text-sm font-black text-amber-700" type="submit">השהה</button>
+                          <button className="h-10 rounded-2xl border border-amber-200 bg-amber-50 px-4 text-sm font-black text-amber-800" type="submit">נעל משתמש</button>
+                        </form>
+                      ) : user.accountStatus === "suspended" ? (
+                        <form action={activateUserAction}>
+                          <input name="userId" type="hidden" value={user.id} />
+                          <button className="h-10 rounded-2xl bg-emerald-600 px-4 text-sm font-black text-white" type="submit">שחרר נעילה</button>
                         </form>
                       ) : (
                         <form action={activateUserAction}>
@@ -1385,9 +1519,17 @@ export default async function AdminPage({
             </form>
             <div className="mt-5 space-y-2">
               {connections.map((connection: any) => (
-                <p className="rounded-2xl bg-slate-50 p-3 text-sm text-slate-600" key={connection.id}>
-                  {connection.label} · {connection.status} · <span dir="ltr">{connection.phoneNumber ?? "אין מספר"}</span> · {connection.currentTenants}/{connection.maxTenants}
-                </p>
+                <div className="grid gap-3 rounded-2xl bg-slate-50 p-3 text-sm text-slate-600 md:grid-cols-[1fr_auto]" key={connection.id}>
+                  <p>
+                    {connection.label} · {connection.workspace?.name ?? "Workspace"} · {connection.status} · <span dir="ltr">{connection.phoneNumber ?? "אין מספר"}</span> · {connection.currentTenants}/{connection.maxTenants}
+                  </p>
+                  <form action={viewWorkspaceConnectionsAction}>
+                    <input name="workspaceId" type="hidden" value={connection.workspaceId} />
+                    <button className="h-10 rounded-2xl bg-cyan-600 px-4 text-sm font-black text-white" type="submit">
+                      סריקת QR / חיבור
+                    </button>
+                  </form>
+                </div>
               ))}
             </div>
           </div>

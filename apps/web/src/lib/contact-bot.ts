@@ -1,6 +1,7 @@
 import { google } from "googleapis";
 import { decryptSecret, renderTemplate } from "@lottery/core";
 import { prisma } from "@lottery/db";
+import { getGoogleOAuthSettings } from "./google-settings";
 import { normalizeIsraeliPhone } from "./phone";
 
 const db = prisma as any;
@@ -9,8 +10,6 @@ export const CONTACT_BOT_BASE_QUOTA = 600;
 export const CONTACT_BOT_MONTHLY_PRICE_CENTS = 5000;
 export const CONTACT_BOT_EXTRA_PACK_SIZE = 100;
 export const CONTACT_BOT_EXTRA_PACK_PRICE_CENTS = 500;
-const DEFAULT_GOOGLE_CLIENT_ID =
-  "455116448878-mlsaq4mflpdm8fpkisnak26tjhmtduf3.apps.googleusercontent.com";
 
 export type ContactBotStatus =
   | "saved_system"
@@ -117,21 +116,21 @@ export async function getContactBotQuota(workspaceId: string) {
   };
 }
 
-function googleAuthForWorkspace(workspace: any) {
+async function googleAuthForWorkspace(workspace: any) {
   if (!workspace.googleAccessTokenEncrypted) {
     return null;
   }
 
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const googleSettings = await getGoogleOAuthSettings();
 
-  if (!clientSecret) {
+  if (!googleSettings.configured) {
     return null;
   }
 
   const auth = new google.auth.OAuth2(
-    process.env.GOOGLE_CLIENT_ID ?? DEFAULT_GOOGLE_CLIENT_ID,
-    clientSecret,
-    process.env.GOOGLE_REDIRECT_URI ?? "http://localhost:3000/api/auth/callback/google"
+    googleSettings.clientId,
+    googleSettings.clientSecret,
+    googleSettings.redirectUri
   );
   auth.setCredentials({
     access_token: decryptSecret(workspace.googleAccessTokenEncrypted),
@@ -318,7 +317,7 @@ export async function saveContactBotEntry(input: {
     };
   }
 
-  const people = googleAuthForWorkspace(workspace);
+  const people = await googleAuthForWorkspace(workspace);
   let status: ContactBotStatus = "saved_system";
   let googlePersonResourceName: string | null = null;
   let syncedAt: Date | null = null;

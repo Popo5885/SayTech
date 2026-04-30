@@ -59,12 +59,19 @@ async function requestWhatsAppCodeAction(formData: FormData) {
 
   const user = await db.user.findFirst({
     where: {
-      phone,
-      accountStatus: "active"
+      phone
     }
   });
 
   if (!user) {
+    redirect(`/login?error=wa-user&phone=${encodeURIComponent(phone)}`);
+  }
+
+  if (user.accountStatus === "suspended") {
+    redirect(`/login?error=locked&phone=${encodeURIComponent(phone)}`);
+  }
+
+  if (user.accountStatus !== "active") {
     redirect(`/login?error=wa-user&phone=${encodeURIComponent(phone)}`);
   }
 
@@ -130,6 +137,7 @@ export default async function LoginPage({
   const hasCredentialsError = params?.error === "credentials" || params?.error === "CredentialsSignin";
   const hasConfigError = params?.error === "Configuration" || params?.error === "google-config";
   const whatsappError = params?.error?.startsWith("wa") ? params.error : null;
+  const lockedError = params?.error === "locked";
   const triedEmail = params?.email ?? "";
   const triedPhone = params?.phone ?? "";
   const authSettings = await getAuthFeatureSettings();
@@ -195,6 +203,12 @@ export default async function LoginPage({
                   : whatsappError === "wa-code"
                     ? "הקוד שהוזן לא תקין או פג תוקף."
                     : "צריך להזין מספר טלפון תקין."}
+            </div>
+          ) : null}
+
+          {lockedError ? (
+            <div className="mt-5 rounded-3xl border border-red-300/25 bg-red-300/12 p-4 text-sm font-semibold leading-7 text-red-100">
+              המשתמש נעול. יש לפנות לתמיכה של Magic Flow במספר <span dir="ltr">054-246-6340</span>.
             </div>
           ) : null}
 
