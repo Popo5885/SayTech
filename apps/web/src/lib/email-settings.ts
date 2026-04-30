@@ -39,17 +39,24 @@ function parseBoolean(value: string | null | undefined, fallback: boolean): bool
 }
 
 async function getSettingsMap(): Promise<Map<string, string>> {
-  const settings = await db.siteSetting.findMany({
-    where: {
-      key: {
-        in: Object.values(SMTP_SETTING_KEYS)
+  try {
+    const settings = await db.siteSetting.findMany({
+      where: {
+        key: {
+          in: Object.values(SMTP_SETTING_KEYS)
+        }
       }
-    }
-  });
+    });
 
-  return new Map<string, string>(
-    settings.map((setting: any) => [String(setting.key), String(setting.value)])
-  );
+    return new Map<string, string>(
+      settings.map((setting: any) => [String(setting.key), String(setting.value)])
+    );
+  } catch (error) {
+    // Defensive fallback so a momentary DB outage doesn't crash any page that
+    // happens to read SMTP config (registration page, password reset, admin).
+    console.error("[email-settings:db-unreachable]", error);
+    return new Map<string, string>();
+  }
 }
 
 function decryptStoredSecret(value: string | null | undefined): string {

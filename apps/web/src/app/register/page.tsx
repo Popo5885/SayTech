@@ -85,7 +85,14 @@ export default async function RegisterPage({
   const hasError = params?.error === "missing";
   const hasGoogleConfigError = params?.error === "google-config";
   const initialEmail = params?.email ?? "";
-  const googleReady = (await getAuthFeatureSettings()).googleLoginEnabled;
+  // Same defensive pattern as /login: never crash registration because the DB
+  // is briefly unreachable or the schema isn't pushed yet.
+  let googleReady = false;
+  try {
+    googleReady = (await getAuthFeatureSettings()).googleLoginEnabled;
+  } catch (error) {
+    console.error("[register:settings-failed]", error);
+  }
 
   return (
     <main className="aurora-surface relative min-h-screen overflow-hidden bg-[#070914] px-4 py-10 text-white" dir="rtl">

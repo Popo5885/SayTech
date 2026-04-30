@@ -140,7 +140,25 @@ export default async function LoginPage({
   const lockedError = params?.error === "locked";
   const triedEmail = params?.email ?? "";
   const triedPhone = params?.phone ?? "";
-  const authSettings = await getAuthFeatureSettings();
+  // The login page must never crash because the DB is unreachable. If
+  // settings can't be loaded, fall back to a minimal-but-usable form.
+  let authSettings: Awaited<ReturnType<typeof getAuthFeatureSettings>>;
+  let infrastructureWarning: string | null = null;
+  try {
+    authSettings = await getAuthFeatureSettings();
+  } catch (error) {
+    console.error("[login:settings-failed]", error);
+    authSettings = {
+      googleConfigured: false,
+      googleLoginAdminEnabled: false,
+      googleLoginEnabled: false,
+      whatsappLoginEnabled: false,
+      whatsappManualCodeEnabled: false,
+      whatsappSenderConfigured: false
+    };
+    infrastructureWarning =
+      "המערכת לא הצליחה להגיע לבסיס הנתונים כרגע. אפשר לנסות להתחבר עם מייל וסיסמה — אם זה לא עובד, נסה שוב בעוד דקה.";
+  }
   const googleReady = authSettings.googleLoginEnabled;
   const whatsappReady = authSettings.whatsappLoginEnabled;
   const registerHref = triedEmail
@@ -175,6 +193,12 @@ export default async function LoginPage({
         <section className="border-beam-card rounded-[34px] border border-white/10 bg-white/[0.08] p-6 text-white shadow-2xl backdrop-blur-xl md:p-8">
           <h2 className="text-3xl font-black">טוב שחזרת</h2>
           <p className="mt-2 text-slate-300">בחר דרך כניסה והמשך לדשבורד שלך.</p>
+
+          {infrastructureWarning ? (
+            <div className="mt-5 rounded-3xl border border-amber-300/25 bg-amber-300/12 p-4 text-sm font-semibold leading-7 text-amber-100">
+              {infrastructureWarning}
+            </div>
+          ) : null}
 
           {hasCredentialsError ? (
             <div className="mt-5 rounded-3xl border border-amber-300/25 bg-amber-300/12 p-4 text-sm font-semibold leading-7 text-amber-100">

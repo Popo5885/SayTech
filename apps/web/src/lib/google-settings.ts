@@ -19,17 +19,24 @@ type GoogleOAuthSettingInput = {
 };
 
 async function getSettingsMap(): Promise<Map<string, string>> {
-  const settings = await db.siteSetting.findMany({
-    where: {
-      key: {
-        in: Object.values(GOOGLE_SETTING_KEYS)
+  try {
+    const settings = await db.siteSetting.findMany({
+      where: {
+        key: {
+          in: Object.values(GOOGLE_SETTING_KEYS)
+        }
       }
-    }
-  });
+    });
 
-  return new Map<string, string>(
-    settings.map((setting: any) => [String(setting.key), String(setting.value)])
-  );
+    return new Map<string, string>(
+      settings.map((setting: any) => [String(setting.key), String(setting.value)])
+    );
+  } catch (error) {
+    // Same defensive pattern as auth-settings: never crash login because the
+    // database is briefly unreachable or the schema hasn't been pushed yet.
+    console.error("[google-settings:db-unreachable]", error);
+    return new Map<string, string>();
+  }
 }
 
 function decryptStoredSecret(value: string | null | undefined): string {

@@ -12,6 +12,7 @@ import { createVerificationCode, hashPassword, hashVerificationCode, isEnglishPa
 import { normalizeIsraeliPhone } from "../../lib/phone";
 import { provisionWorkspaceForUser } from "../../lib/provisioning";
 import { AdminMobileMenu } from "../../components/admin-mobile-menu";
+import { SuccessSubmitButton } from "../../components/success-submit-button";
 
 const db = prisma as any;
 
@@ -1140,9 +1141,7 @@ export default async function AdminPage({
                   </span>
                 </span>
               </label>
-              <button className="h-11 rounded-2xl bg-gradient-to-l from-emerald-500 to-cyan-500 px-5 font-black text-slate-950 shadow-[0_14px_35px_rgba(20,184,166,0.22)] transition hover:-translate-y-0.5" type="submit">
-                שמור הגדרות כניסה
-              </button>
+              <SuccessSubmitButton>שמור הגדרות כניסה</SuccessSubmitButton>
             </form>
           </div>
 

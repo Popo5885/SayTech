@@ -43,42 +43,57 @@ export async function hasOfficialWhatsAppSender(): Promise<boolean> {
     return true;
   }
 
-  const envAccessToken = process.env.WHATSAPP_ACCESS_TOKEN ?? process.env.META_WHATSAPP_ACCESS_TOKEN;
-  const connection = await db.whatsAppConnection.findFirst({
-    where: {
-      provider: "official_business",
-      officialPhoneNumberId: {
-        not: null
+  try {
+    const envAccessToken = process.env.WHATSAPP_ACCESS_TOKEN ?? process.env.META_WHATSAPP_ACCESS_TOKEN;
+    const connection = await db.whatsAppConnection.findFirst({
+      where: {
+        provider: "official_business",
+        officialPhoneNumberId: {
+          not: null
+        },
+        ...(envAccessToken
+          ? {}
+          : {
+              officialAccessTokenEncrypted: {
+                not: null
+              }
+            })
       },
-      ...(envAccessToken
-        ? {}
-        : {
-            officialAccessTokenEncrypted: {
-              not: null
-            }
-          })
-    },
-    select: {
-      id: true
-    }
-  });
+      select: {
+        id: true
+      }
+    });
 
-  return Boolean(connection);
+    return Boolean(connection);
+  } catch (error) {
+    console.error("[auth-settings:wa-sender-db-unreachable]", error);
+    return false;
+  }
 }
 
 async function getSettingsMap(): Promise<Map<string, string>> {
   const keys = Object.values(AUTH_SETTING_KEYS);
-  const settings = await db.siteSetting.findMany({
-    where: {
-      key: {
-        in: keys
-      }
-    }
-  });
 
-  return new Map<string, string>(
-    settings.map((setting: any) => [String(setting.key), String(setting.value)])
-  );
+  try {
+    const settings = await db.siteSetting.findMany({
+      where: {
+        key: {
+          in: keys
+        }
+      }
+    });
+
+    return new Map<string, string>(
+      settings.map((setting: any) => [String(setting.key), String(setting.value)])
+    );
+  } catch (error) {
+    // If the database is unreachable or the schema hasn't been pushed yet
+    // (common right after a fresh Railway deploy) we MUST NOT throw — every
+    // login/register render would crash with a cryptic Next.js digest error.
+    // Fall back to env-only configuration instead.
+    console.error("[auth-settings:db-unreachable]", error);
+    return new Map<string, string>();
+  }
 }
 
 export async function setAuthFeatureSetting(
