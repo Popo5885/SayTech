@@ -34,7 +34,9 @@ function buildWhatsAppLink(
     top10: "",
     contact_phone: whatsappPhone,
     campaign_name: campaignName,
-    ref: referralToken ?? ""
+    ref: referralToken ?? "",
+    email: "",
+    group_invite_link: ""
   }).trim();
 
   if (referralToken && !body.includes(referralToken)) {

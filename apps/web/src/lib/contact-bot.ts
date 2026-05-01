@@ -61,7 +61,9 @@ export function buildContactDisplayName(input: {
     top10: "",
     contact_phone: normalizeContactPhone(input.phone),
     campaign_name: input.campaignName ?? "",
-    ref: ""
+    ref: "",
+    email: "",
+    group_invite_link: ""
   });
 }
 

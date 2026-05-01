@@ -82,7 +82,9 @@ export class GoogleContactsSyncService {
       top10: "",
       contact_phone: contactPhone,
       campaign_name: "",
-      ref: participant.referralToken
+      ref: participant.referralToken,
+      email: participant.email ?? "",
+      group_invite_link: ""
     });
   }
 

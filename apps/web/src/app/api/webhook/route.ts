@@ -146,7 +146,9 @@ function render(campaign: Campaign, participant: Participant, key: MessageTempla
     top10: "",
     contact_phone: participant.phone,
     campaign_name: campaign.name,
-    ref: participant.referralToken
+    ref: participant.referralToken,
+    email: participant.email ?? "",
+    group_invite_link: campaign.groupInviteLink ?? ""
   });
 }
 
