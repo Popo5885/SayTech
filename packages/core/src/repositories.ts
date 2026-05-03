@@ -1259,7 +1259,13 @@ export class CampaignRepository {
             : updates.drawDate
               ? new Date(updates.drawDate)
               : null,
-        drawWeightMode: updates.drawWeightMode
+        drawWeightMode: updates.drawWeightMode,
+        // Multi-tenant routing: triggerWord change is zero-latency —
+        // the worker re-queries DB on every inbound message, so the new
+        // trigger takes effect immediately without a restart.
+        ...(updates.triggerWord !== undefined && { triggerWord: updates.triggerWord }),
+        ...(updates.collectEmail !== undefined && { collectEmail: updates.collectEmail }),
+        ...(updates.groupInviteLink !== undefined && { groupInviteLink: updates.groupInviteLink })
       }
     });
 

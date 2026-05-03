@@ -1,5 +1,5 @@
 import { EmptyWorkspaceState } from "../../../components/empty-workspace-state";
-import { MessageEditor } from "../../../components/message-editor";
+import { MessagesShell } from "../../../components/messages-shell";
 import { getConnectionSnapshot, getPrimaryStore, getTemplates } from "../../../lib/live-store";
 
 export default async function DashboardMessagesPage() {
@@ -16,12 +16,10 @@ export default async function DashboardMessagesPage() {
 
   const templates = await getTemplates(store.campaign.id);
   const snapshot = await getConnectionSnapshot(store.connection.id);
+  const connectionStatus = snapshot.workerOnline ? snapshot.status : "disconnected";
 
   return (
-    <MessageEditor
+    <MessagesShell
       campaignId={store.campaign.id}
-      connectionStatus={snapshot.workerOnline ? snapshot.status : "disconnected"}
-      initialTemplates={templates}
-    />
-  );
-}
+      connectionStatus={connectionStatus}
+    

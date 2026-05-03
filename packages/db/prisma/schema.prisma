@@ -206,6 +206,9 @@ model Workspace {
   contactCards                WorkspaceContactCard[]
   automationRules             AutomationRule[]
   billingRecords              BillingRecord[]
+  affiliatePointsLedger       AffiliatePointsLedger[]
+  affiliatePointsBalance      AffiliatePointsBalance?
+  affiliateRedemptions        AffiliateRedemption[]
   messageLogs                 MessageLog[]
 }
 
@@ -639,9 +642,4 @@ model WinnerDraw {
   participantName  String
   participantPhone String
   createdAt        DateTime    @default(now())
-  campaign         Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  participant      Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
-
-  @@index([campaignId])
-  @@index([participantId])
-}
+  campaign         Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)

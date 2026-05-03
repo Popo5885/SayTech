@@ -5,6 +5,7 @@ import { auth } from "../../../auth";
 import { SuccessSubmitButton } from "../../../components/success-submit-button";
 import { getPrimaryStore } from "../../../lib/live-store";
 import { normalizeIsraeliPhone } from "../../../lib/phone";
+import { getBalance, getLedger, redeemPoints, POINTS_PER_NIS_DISCOUNT } from "../../../lib/affiliate-points";
 
 const db = prisma as any;
 
@@ -115,6 +116,12 @@ export default async function SettingsPage({
   const params = await searchParams;
   const user = await db.user.findUnique({ where: { id: userId } });
   const store = await getPrimaryStore();
+
+  // Affiliate points
+  const [pointsBalance, pointsLedger] = store
+    ? await Promise.all([getBalance(store.workspace.id), getLedger(store.workspace.id, 10)])
+    : [0, []];
+
   const contactCards = store
     ? await db.workspaceContactCard.findMany({
         where: {
@@ -259,15 +266,4 @@ export default async function SettingsPage({
                 </div>
                 <form action={deleteContactCardAction}>
                   <input name="cardId" type="hidden" value={card.id} />
-                  <button className="h-10 rounded-2xl border border-red-200 px-4 text-sm font-black text-red-700" type="submit">
-                    הסר
-                  </button>
-                </form>
-              </div>
-            ))
-          )}
-        </div>
-      </section>
-    </main>
-  );
-}
+                  <b

@@ -129,6 +129,12 @@ export interface CampaignTemplateUpdateInput {
 export interface CampaignSettingsUpdate {
   drawDate?: string | null;
   drawWeightMode?: DrawWeightMode;
+  /** Join trigger word — takes effect on the very next message (zero-latency). */
+  triggerWord?: string | null;
+  /** Collect participant email during onboarding? */
+  collectEmail?: boolean;
+  /** WhatsApp group invite link sent after registration. */
+  groupInviteLink?: string | null;
 }
 
 export interface Campaign {
