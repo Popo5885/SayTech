@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { isRedirectError } from "next/dist/client/components/redirect-error";
-import { ArrowLeft, Sparkles } from "lucide-react";
+import { ArrowLeft, Sparkles, AlertTriangle } from "lucide-react";
 import { prisma } from "@lottery/db";
 import { signIn } from "../../auth";
 import { SuccessSubmitButton } from "../../components/success-submit-button";
@@ -18,6 +18,8 @@ async function loginAction(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
   const adminEmail = (process.env.SUPERADMIN_EMAIL ?? "aknvpupuch@gmail.com").toLowerCase();
+  // Track consecutive failures so the client can auto-surface the Forgot-Password CTA.
+  const prevAttempts = Math.max(0, parseInt(String(formData.get("attempts") ?? "0"), 10) || 0);
 
   try {
     await signIn("credentials", {
@@ -30,7 +32,8 @@ async function loginAction(formData: FormData) {
       throw error;
     }
 
-    redirect(`/login?error=credentials&email=${encodeURIComponent(email)}`);
+    const nextAttempts = prevAttempts + 1;
+    redirect(`/login?error=credentials&email=${encodeURIComponent(email)}&attempts=${nextAttempts}`);
   }
 }
 
@@ -131,7 +134,7 @@ async function verifyWhatsAppCodeAction(formData: FormData) {
 export default async function LoginPage({
   searchParams
 }: {
-  searchParams?: Promise<{ error?: string; email?: string; phone?: string; wa?: string }>;
+  searchParams?: Promise<{ error?: string; email?: string; phone?: string; wa?: string; attempts?: string }>;
 }) {
   const params = await searchParams;
   const hasCredentialsError = params?.error === "credentials" || params?.error === "CredentialsSignin";
@@ -140,6 +143,10 @@ export default async function LoginPage({
   const lockedError = params?.error === "locked";
   const triedEmail = params?.email ?? "";
   const triedPhone = params?.phone ?? "";
+  // Number of consecutive failed credential attempts (reset when the user navigates away).
+  const failureAttempts = Math.max(0, parseInt(params?.attempts ?? "0", 10) || 0);
+  const autoShowForgotPassword = failureAttempts >= 2;
+
   // The login page must never crash because the DB is unreachable. If
   // settings can't be loaded, fall back to a minimal-but-usable form.
   let authSettings: Awaited<ReturnType<typeof getAuthFeatureSettings>>;
@@ -200,13 +207,43 @@ export default async function LoginPage({
             </div>
           ) : null}
 
-          {hasCredentialsError ? (
+          {hasCredentialsError && !autoShowForgotPassword ? (
             <div className="mt-5 rounded-3xl border border-amber-300/25 bg-amber-300/12 p-4 text-sm font-semibold leading-7 text-amber-100">
               <p>פרטי ההתחברות לא זוהו. אפשר לפתוח חשבון חדש או לאפס סיסמה.</p>
               <Link className="mt-3 inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-2 font-black text-slate-950 transition hover:-translate-y-0.5" href={registerHref}>
                 פתיחת חשבון
                 <ArrowLeft className="h-4 w-4" />
               </Link>
+            </div>
+          ) : null}
+
+          {/* Auto-surface Forgot Password after 2 consecutive failures */}
+          {autoShowForgotPassword ? (
+            <div className="mt-5 rounded-3xl border border-red-400/30 bg-red-500/15 p-5 text-sm font-semibold leading-7 text-red-100">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-300" />
+                <div>
+                  <p className="font-black text-white">נראה שהסיסמה לא נכונה</p>
+                  <p className="mt-1">
+                    ניסית להתחבר {failureAttempts} פעמים ללא הצלחה. כדאי לאפס את הסיסמה.
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-3">
+                    <Link
+                      className="inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-2 font-black text-slate-950 transition hover:-translate-y-0.5"
+                      href={`/forgot-password${triedEmail ? `?email=${encodeURIComponent(triedEmail)}` : ""}`}
+                    >
+                      איפוס סיסמה
+                      <ArrowLeft className="h-4 w-4" />
+                    </Link>
+                    <Link
+                      className="inline-flex items-center gap-2 rounded-2xl border border-white/20 px-4 py-2 font-bold text-white transition hover:-translate-y-0.5"
+                      href={registerHref}
+                    >
+                      פתיחת חשבון חדש
+                    </Link>
+                  </div>
+                </div>
+              </div>
             </div>
           ) : null}
 
@@ -237,6 +274,8 @@ export default async function LoginPage({
           ) : null}
 
           <form action={loginAction} className="mt-6 space-y-4">
+            {/* Carry the failure counter forward so loginAction can increment it */}
+            <input type="hidden" name="attempts" value={failureAttempts} />
             <label className="block">
               <span className="font-bold text-slate-200">אימייל</span>
               <input className="mt-2 h-12 w-full rounded-2xl border border-white/10 bg-white/10 px-4 text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300 focus:shadow-[0_0_0_4px_rgba(34,211,238,0.12)]" defaultValue={triedEmail} dir="ltr" name="email" required type="email" />

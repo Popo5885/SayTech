@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 import { AccessibilityWidget } from "../components/accessibility-widget";
+import { CookieConsent } from "../components/cookie-consent";
+import { FacebookPixel } from "../components/facebook-pixel";
+import { UserWayWidget } from "../components/userway-widget";
 import "driver.js/dist/driver.css";
 import "./globals.css";
 
@@ -17,7 +20,14 @@ export default function RootLayout({
     <html dir="rtl" lang="he">
       <body className="font-[var(--font-body)] antialiased">
         {children}
+        {/* In-house accessibility helpers (always available, no JS needed). */}
         <AccessibilityWidget />
+        {/* UserWay third-party accessibility widget — loaded after interaction. */}
+        <UserWayWidget />
+        {/* Cookie consent banner. Marketing scripts wait for the consent event. */}
+        <CookieConsent />
+        {/* Facebook Pixel — only fires PageView after explicit marketing opt-in. */}
+        <FacebookPixel />
       </body>
     </html>
   );

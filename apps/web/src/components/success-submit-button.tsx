@@ -3,23 +3,14 @@
 import { useFormStatus } from "react-dom";
 import { Check } from "lucide-react";
 
+// Submit button with loading state and optional server-confirmed success checkmark.
+// Pass done={true} only after a 200-OK server response to show the green check.
+// For redirect-on-success flows (login etc.) omit done — navigation replaces the button.
 export function SuccessSubmitButton({
   children,
-  className = ""
+  className = "",
+  done = false
 }: {
   children: React.ReactNode;
   className?: string;
-}) {
-  const { pending } = useFormStatus();
-
-  return (
-    <button
-      className={`success-submit-btn ${className}`}
-      disabled={pending}
-      type="submit"
-    >
-      <span className="label">{pending ? "שולח..." : children}</span>
-      <Check className="check-svg" />
-    </button>
-  );
-}
+  // When true the button coll

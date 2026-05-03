@@ -31,7 +31,7 @@ const defaultByKey: Record<MessageTemplateKey, string> = {
   WELCOME:
     "שלום {{name}}, ברוכים הבאים ל{{campaign_name}}.\nכדי להשלים הרשמה, נבקש לשמור את איש הקשר שלנו ואז תקבלו קישור אישי לשיתוף.",
   EMAIL_PROMPT:
-    "מעולה {{name}}!\nכדי שנוכל לעדכן אותך על זכיות ומבצעים, שלח/י לנו את כתובת המייל שלך.",
+    "מעולה {{name}}!\nכדי שנוכל לעדכן אותך על זכיות ומבצעים, שלח/י לנו את כתובת המייל שלך.\n(אם אין לך מייל או שאת/ה מעדיף/ה לדלג — כתוב/י: דלג)",
   REFERRER_PROMPT:
     "מי הזמין אותך להגרלה?\nאפשר לשלוח שם או מספר טלפון. אם אף אחד לא הזמין אותך, כתבו: אין.",
   SAVE_CONTACT_PROMPT:
@@ -58,6 +58,12 @@ const defaultByKey: Record<MessageTemplateKey, string> = {
 };
 
 const interactiveDefaults: Partial<Record<MessageTemplateKey, TemplateInteractiveConfig>> = {
+  EMAIL_PROMPT: {
+    kind: "BUTTONS",
+    options: [
+      { id: "skip_email", label: "דלג" }
+    ]
+  },
   SAVE_CONTACT_PROMPT: {
     kind: "BUTTONS",
     options: [

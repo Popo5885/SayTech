@@ -12,6 +12,7 @@ import {
 } from "@lottery/core";
 import { prisma } from "@lottery/db";
 import { saveContactBotEntry } from "../../../lib/contact-bot";
+import { clientIp, rateLimit, rateLimitResponse } from "../../../lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -39,7 +40,13 @@ function isValidSignature(request: Request, rawBody: string): boolean {
   const secret = appSecret();
 
   if (!secret) {
-    return true;
+    // SECURITY: refuse unsigned webhooks in production. In dev/test allow only
+    // when explicitly opted in via WHATSAPP_ALLOW_UNSIGNED=1.
+    if (process.env.NODE_ENV === "production") {
+      console.error("[webhook] Rejecting request: WHATSAPP_APP_SECRET is not configured.");
+      return false;
+    }
+    return process.env.WHATSAPP_ALLOW_UNSIGNED === "1";
   }
 
   const signature = request.headers.get("x-hub-signature-256") ?? "";
@@ -125,6 +132,12 @@ function buildVcf(cards: ContactCardPayload[]): string {
 function interactiveReplyId(message: any): string | null {
   return message?.interactive?.button_reply?.id ?? message?.interactive?.list_reply?.id ?? null;
 }
+
+function looksLikeEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+
+const SKIP_EMAIL_MATCHERS = ["דלג", "לדלג", "skip", "אין מייל", "אין"];
 
 function template(campaign: Campaign, key: MessageTemplateKey): CampaignMessageTemplate | null {
   return campaign.templates.find((item) => item.key === key && item.isEnabled !== false) ?? null;
@@ -354,10 +367,43 @@ async function processMessage(connection: any, rawMessage: any): Promise<void> {
     if (welcome) outbound.push(welcome);
   } else if (current.onboardingState === "AWAITING_NAME" && body.trim()) {
     current = await participantRepository.captureName(current.id, body);
-    current = await participantRepository.markAwaitingContactSave(current.id);
-    const prompt = render(campaign, current, "SAVE_CONTACT_PROMPT");
-    if (prompt) outbound.push(prompt);
-    shouldSendContactCard = Boolean(prompt);
+
+    // If the campaign collects emails and the template is enabled, ask for it.
+    const emailTemplateEnabled = campaign.templates.some(
+      (t: CampaignMessageTemplate) => t.key === "EMAIL_PROMPT" && t.isEnabled !== false
+    );
+
+    if ((campaign as any).collectEmail && emailTemplateEnabled) {
+      current = await participantRepository.markAwaitingEmail(current.id);
+      const emailPrompt = render(campaign, current, "EMAIL_PROMPT");
+      if (emailPrompt) outbound.push(emailPrompt);
+    } else {
+      current = await participantRepository.markAwaitingContactSave(current.id);
+      const prompt = render(campaign, current, "SAVE_CONTACT_PROMPT");
+      if (prompt) outbound.push(prompt);
+      shouldSendContactCard = Boolean(prompt);
+    }
+  } else if (current.onboardingState === "AWAITING_EMAIL") {
+    const isSkip =
+      replyId === "skip_email" || SKIP_EMAIL_MATCHERS.some((m) => normalizedBody === m);
+
+    if (isSkip) {
+      // User chose to skip email — proceed to contact-save step.
+      current = await participantRepository.markAwaitingContactSave(current.id);
+      const prompt = render(campaign, current, "SAVE_CONTACT_PROMPT");
+      if (prompt) outbound.push(prompt);
+      shouldSendContactCard = Boolean(prompt);
+    } else if (looksLikeEmail(body)) {
+      current = await participantRepository.captureEmail(current.id, body);
+      current = await participantRepository.markAwaitingContactSave(current.id);
+      const prompt = render(campaign, current, "SAVE_CONTACT_PROMPT");
+      if (prompt) outbound.push(prompt);
+      shouldSendContactCard = Boolean(prompt);
+    } else {
+      // Invalid input — re-send the email prompt.
+      const emailPrompt = render(campaign, current, "EMAIL_PROMPT");
+      if (emailPrompt) outbound.push(emailPrompt);
+    }
   } else if (
     current.onboardingState === "AWAITING_CONTACT_SAVED" &&
     (replyId === "saved_contact_yes" || ["saved", "yes", "כן", "שמרתי"].includes(normalizedBody))
@@ -435,6 +481,12 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  // SECURITY: rate-limit by source IP. 120 requests / minute is well above
+  // legitimate Meta webhook fan-out yet stops floods from a misconfigured peer.
+  const limit = rateLimit({ key: `webhook:${clientIp(request)}`, limit: 120, windowMs: 60_000 });
+  const tooMany = rateLimitResponse(limit);
+  if (tooMany) return tooMany;
+
   const rawBody = await request.text();
 
   if (!isValidSignature(request, rawBody)) {

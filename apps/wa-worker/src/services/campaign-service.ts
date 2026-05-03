@@ -191,7 +191,7 @@ export class CampaignService {
         break;
 
       case "AWAITING_EMAIL":
-        if (matchesOneOf(message.body, SKIP_EMAIL_MATCHERS)) {
+        if (matchesInteractiveReply(message, "skip_email", SKIP_EMAIL_MATCHERS)) {
           currentParticipant = await this.participantRepository.markAwaitingContactSave(
             currentParticipant.id
           );

@@ -1,20 +1,7 @@
 name: Deploy to Railway
 
-on:
-  push:
-    branches:
-      - main
-
-jobs:
-  deploy:
-    name: Deploy
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Deploy to Railway
-        uses: bervProject/railway-deploy@main
-        with:
-          railway_token: ${{ secrets.RAILWAY_TOKEN }}
-          service: ${{ secrets.RAILWAY_SERVICE }}
+# Triggered on every push to main. Requires two GitHub Actions secrets:
+#   RAILWAY_TOKEN   — project token starting with "b971..." (rotate via Railway
+#                     -> Account -> Tokens whenever team membership changes).
+#   RAILWAY_SERVICE — UUID of the Railway service to deploy. Default fallback
+#                     below points at the production "web"
