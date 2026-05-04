@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { AccessibilityWidget } from "../components/accessibility-widget";
+import { ConnectionRecoveryBanner } from "../components/connection-recovery-banner";
 import { CookieConsent } from "../components/cookie-consent";
 import { FacebookPixel } from "../components/facebook-pixel";
 import { UserWayWidget } from "../components/userway-widget";
@@ -20,6 +21,8 @@ export default function RootLayout({
     <html dir="rtl" lang="he">
       <body className="font-[var(--font-body)] antialiased">
         {children}
+        {/* Global connection recovery overlay — detects server/WS drops. */}
+        <ConnectionRecoveryBanner />
         {/* In-house accessibility helpers (always available, no JS needed). */}
         <AccessibilityWidget />
         {/* UserWay third-party accessibility widget — loaded after interaction. */}

@@ -22,4 +22,7 @@ export default async function DashboardMessagesPage() {
     <MessagesShell
       campaignId={store.campaign.id}
       connectionStatus={connectionStatus}
-    
+      initialTemplates={templates}
+    />
+  );
+}

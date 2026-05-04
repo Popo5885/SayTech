@@ -26,4 +26,10 @@ export default async function DashboardCampaignsPage() {
       <Card className="space-y-3">
         <CardTitle>כללי קמפיין</CardTitle>
         <CardDescription>
-          לכל משתתף נשמר קישור אישי קבוע. ה
+          לכל משתתף נשמר קישור אישי קבוע. המערכת מונעת הפניות כפולות והפניה עצמית,
+          והמשתתפים יכולים לבדוק סטטוס אישי ישירות מ-WhatsApp.
+        </CardDescription>
+      </Card>
+    </div>
+  );
+}

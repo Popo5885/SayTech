@@ -110,20 +110,33 @@ export default async function RegisterPage({
             </span>
             Magic Flow
           </Link>
-          <h1 className="mt-16 text-4xl font-black leading-tight md:text-5xl">פתיחת חשבון Magic Flow</h1>
+          <div className="mt-10 inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-amber-400/10 px-4 py-2 text-sm font-black text-amber-300">
+            <span className="h-2 w-2 rounded-full bg-amber-400" />
+            מסלול VIP בלבד
+          </div>
+          <h1 className="mt-6 text-4xl font-black leading-tight md:text-5xl">טופס בקשת הצטרפות VIP</h1>
           <p className="mt-5 text-lg leading-8 text-slate-300">
-            ממלאים פרטים, צוות Magic Flow בודק את הבקשה, ולאחר אישור סביבת העבודה מוכנה לשימוש.
+            Magic Flow היא מערכת DFY (Done-For-You) בלעדית. צוות Magic Flow בונה עבורך את מערכת ה-WhatsApp מהיסוד, מקצה מספר, ומפעיל את ההגרלה.
           </p>
-          <div className="mt-8 space-y-3 text-sm font-semibold text-slate-300">
-            <p>1. שליחת בקשת הצטרפות</p>
-            <p>2. בדיקה ידנית קצרה</p>
-            <p>3. קבלת גישה ללוח עבודה ברור ופשוט</p>
+          <div className="mt-8 space-y-4 text-sm font-semibold text-slate-300">
+            <div className="flex items-center gap-3">
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-amber-400/20 text-xs font-black text-amber-300">1</span>
+              <span>שליחת טופס הצטרפות VIP</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-amber-400/20 text-xs font-black text-amber-300">2</span>
+              <span>בדיקה ואישור ידני על-ידי הצוות</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-amber-400/20 text-xs font-black text-amber-300">3</span>
+              <span>קבלת גישה לחדר הבקרה האישי שלך</span>
+            </div>
           </div>
         </section>
 
         <section className="border-beam-card rounded-[34px] border border-white/10 bg-white/[0.08] p-6 text-white shadow-2xl backdrop-blur-xl md:p-8">
-          <h2 className="text-3xl font-black">הרשמה</h2>
-          <p className="mt-2 text-slate-300">מספר הטלפון יישמר בפורמט WhatsApp תקני.</p>
+          <h2 className="text-3xl font-black">בקשת הצטרפות VIP</h2>
+          <p className="mt-2 text-slate-300">הבקשה תישלח לצוות לאישור. תקבלו עדכון במייל ברגע שהחשבון מוכן.</p>
 
           {hasError ? (
             <div className="mt-5 rounded-3xl border border-red-300/25 bg-red-300/12 p-4 text-sm font-semibold text-red-100">
@@ -175,7 +188,7 @@ export default async function RegisterPage({
                 קראתי ואישרתי את <Link className="font-bold text-cyan-200 hover:text-white" href="/terms">תנאי השימוש</Link> ואת <Link className="font-bold text-cyan-200 hover:text-white" href="/privacy">מדיניות הפרטיות</Link>.
               </span>
             </label>
-            <SuccessSubmitButton>שליחת בקשה</SuccessSubmitButton>
+            <SuccessSubmitButton>שלח בקשת הצטרפות VIP</SuccessSubmitButton>
           </form>
 
           <p className="mt-6 text-sm text-slate-300">

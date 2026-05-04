@@ -9,7 +9,7 @@ export async function POST(
 ) {
   // SECURITY: authenticate the caller before touching the draw.
   const session = await auth();
-  const userId = (session?.user as any)?.id ? String((session.user as any).id) : null;
+  const userId = (session?.user as any)?.id ? String((session?.user as any).id) : null;
 
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });

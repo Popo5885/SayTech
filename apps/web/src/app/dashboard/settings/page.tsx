@@ -266,4 +266,44 @@ export default async function SettingsPage({
                 </div>
                 <form action={deleteContactCardAction}>
                   <input name="cardId" type="hidden" value={card.id} />
-                  <b
+                  <button className="h-10 rounded-2xl border border-red-200 bg-red-50 px-4 text-sm font-black text-red-700 transition hover:bg-red-100" type="submit">
+                    מחק
+                  </button>
+                </form>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
+
+      {store ? (
+        <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
+          <p className="text-sm font-black text-violet-700">נקודות שותפים</p>
+          <h2 className="mt-2 text-3xl font-black text-slate-950">יתרת נקודות</h2>
+          <p className="mt-3 max-w-2xl leading-7 text-slate-500">
+            על כל תשלום שאושר בוובהוק נזכים 20 נקודות. 100 נקודות = הנחה של 100 ₪.
+          </p>
+
+          <div className="mt-5 rounded-2xl border border-violet-100 bg-violet-50 p-5">
+            <p className="text-sm font-black text-violet-700">יתרה נוכחית</p>
+            <p className="mt-2 text-4xl font-black text-violet-950">{pointsBalance} נקודות</p>
+          </div>
+
+          {pointsLedger.length > 0 ? (
+            <div className="mt-5 space-y-2">
+              <p className="text-sm font-black text-slate-700">היסטוריית נקודות</p>
+              {pointsLedger.map((entry: any) => (
+                <div className="flex items-center justify-between rounded-2xl bg-slate-50 p-3 text-sm" key={entry.id}>
+                  <span className="text-slate-600">{entry.note ?? entry.source}</span>
+                  <span className={`font-black ${entry.deltaPoints > 0 ? "text-emerald-700" : "text-red-700"}`}>
+                    {entry.deltaPoints > 0 ? "+" : ""}{entry.deltaPoints}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+    </main>
+  );
+}

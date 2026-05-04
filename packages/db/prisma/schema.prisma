@@ -26,6 +26,7 @@ enum AccountStatus {
 
 enum GlobalRole {
   SUPER_ADMIN
+  SUB_ADMIN
   USER
 }
 
@@ -642,4 +643,63 @@ model WinnerDraw {
   participantName  String
   participantPhone String
   createdAt        DateTime    @default(now())
-  campaign         Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaign         Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  participant      Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId])
+  @@index([participantId])
+}
+
+enum AffiliatePointsSource {
+  payment_webhook
+  manual_adjustment
+  referral_bonus
+}
+
+enum AffiliateRedemptionStatus {
+  pending
+  applied
+  cancelled
+}
+
+model AffiliatePointsLedger {
+  id              String                @id @default(cuid())
+  workspaceId     String
+  deltaPoints     Int
+  source          AffiliatePointsSource @default(payment_webhook)
+  billingRecordId String?
+  note            String?               @db.Text
+  createdAt       DateTime              @default(now())
+  workspace       Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([workspaceId, createdAt])
+  @@index([billingRecordId])
+}
+
+model AffiliatePointsBalance {
+  id          String    @id @default(cuid())
+  workspaceId String    @unique
+  totalPoints Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+}
+
+model AffiliateRedemption {
+  id             String                    @id @default(cuid())
+  workspaceId    String
+  pointsRedeemed Int
+  discountAgorot Int
+  status         AffiliateRedemptionStatus @default(pending)
+  note           String?                   @db.Text
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
+  workspace      Workspace                 @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([workspaceId, status])
+  @@index([createdAt])
+}

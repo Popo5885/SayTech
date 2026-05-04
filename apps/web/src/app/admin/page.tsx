@@ -152,6 +152,12 @@ async function suspendUserAction(formData: FormData) {
 
   await requireAdminUser();
   const userId = String(formData.get("userId") ?? "");
+  const target = await db.user.findUnique({ where: { id: userId }, select: { email: true, globalRole: true } });
+
+  if (target?.email?.toLowerCase() === (process.env.SUPERADMIN_EMAIL ?? "aknvpupuch@gmail.com").toLowerCase()) {
+    redirect("/admin?error=subadmin-protected#customers");
+  }
+
   const user = await db.user.update({
     where: { id: userId },
     data: { accountStatus: "suspended", suspendedAt: new Date() }
@@ -686,6 +692,94 @@ async function sendTestEmailAction() {
   redirect(sent ? "/admin?saved=smtp-test#smtp-settings" : "/admin?error=smtp-test#smtp-settings");
 }
 
+const PRIMARY_SUPER_ADMIN = (process.env.SUPERADMIN_EMAIL ?? "aknvpupuch@gmail.com").toLowerCase();
+
+async function createSubAdminAction(formData: FormData) {
+  "use server";
+
+  const actor = await requireAdminUser();
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const fullName = String(formData.get("fullName") ?? "").trim();
+  const password = String(formData.get("password") ?? "");
+
+  if (!email || !fullName || !isEnglishPassword(password)) {
+    redirect("/admin?error=subadmin-invalid#team");
+  }
+
+  if (email === PRIMARY_SUPER_ADMIN) {
+    redirect("/admin?error=subadmin-protected#team");
+  }
+
+  const user = await db.user.upsert({
+    where: { email },
+    update: {
+      fullName,
+      name: fullName,
+      passwordHash: hashPassword(password),
+      globalRole: "SUB_ADMIN",
+      accountStatus: "active",
+      approvedAt: new Date()
+    },
+    create: {
+      email,
+      fullName,
+      name: fullName,
+      passwordHash: hashPassword(password),
+      globalRole: "SUB_ADMIN",
+      accountStatus: "active",
+      approvedAt: new Date()
+    }
+  });
+
+  await db.adminAuditLog.create({
+    data: {
+      actorUserId: actor.id,
+      action: "SUB_ADMIN_CREATED",
+      targetType: "User",
+      targetId: user.id,
+      metadata: { email }
+    }
+  });
+  revalidatePath("/admin");
+  redirect("/admin?saved=subadmin#team");
+}
+
+async function deleteSubAdminAction(formData: FormData) {
+  "use server";
+
+  const actor = await requireAdminUser();
+  const userId = String(formData.get("userId") ?? "");
+  const user = await db.user.findUnique({ where: { id: userId } });
+
+  if (!user) {
+    redirect("/admin#team");
+  }
+
+  if (user.email.toLowerCase() === PRIMARY_SUPER_ADMIN) {
+    redirect("/admin?error=subadmin-protected#team");
+  }
+
+  if (user.globalRole === "SUPER_ADMIN") {
+    redirect("/admin?error=subadmin-protected#team");
+  }
+
+  await db.user.update({
+    where: { id: userId },
+    data: { globalRole: "USER" }
+  });
+  await db.adminAuditLog.create({
+    data: {
+      actorUserId: actor.id,
+      action: "SUB_ADMIN_DEMOTED",
+      targetType: "User",
+      targetId: userId,
+      metadata: { email: user.email }
+    }
+  });
+  revalidatePath("/admin");
+  redirect("/admin?saved=subadmin-removed#team");
+}
+
 async function setManualWhatsAppLoginCodeAction(formData: FormData) {
   "use server";
 
@@ -792,7 +886,8 @@ export default async function AdminPage({
     broadcasts,
     billingRecords,
     siteSettings,
-    upgradeRequests
+    upgradeRequests,
+    subAdmins
   ] = await Promise.all([
     db.user.findMany({ where: { accountStatus: "pending" }, orderBy: { createdAt: "desc" } }),
     db.contactLead.findMany({ where: { status: "open" }, orderBy: { createdAt: "desc" } }),
@@ -804,7 +899,8 @@ export default async function AdminPage({
     db.emailBroadcast.findMany({ orderBy: { createdAt: "desc" }, take: 10 }),
     db.billingRecord.findMany({ orderBy: { createdAt: "desc" }, take: 20, include: { workspace: true } }),
     db.siteSetting.findMany(),
-    db.contactBotUpgradeRequest.findMany({ where: { status: "open" }, orderBy: { createdAt: "desc" }, take: 50, include: { workspace: true } })
+    db.contactBotUpgradeRequest.findMany({ where: { status: "open" }, orderBy: { createdAt: "desc" }, take: 50, include: { workspace: true } }),
+    db.user.findMany({ where: { globalRole: { in: ["SUB_ADMIN", "SUPER_ADMIN"] } }, orderBy: { createdAt: "asc" } })
   ]);
   const workspaceByEmail = new Map<string, any>(
     workspaces
@@ -882,6 +978,7 @@ export default async function AdminPage({
             <h2 className="mt-2 text-2xl font-black text-slate-950">כל פעולות הניהול החשובות</h2>
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
               {[
+                ["צוות ניהול", "#team", "Sub-Admins עם הרשאות מוגבלות"],
                 ["לקוחות", "#customers", "אישור, השהיה וכניסה לממשק לקוח"],
                 ["חיבורי WhatsApp", "#connections", "הוספת Official או כלי צוות"],
                 ["כניסות", "#auth-settings", "Google ו-WhatsApp OTP"],
@@ -1038,6 +1135,103 @@ export default async function AdminPage({
             לא נמצא משתמש פעיל עם מספר הטלפון הזה. עדכן את מספר המשתמש או אשר את החשבון לפני יצירת קוד.
           </div>
         ) : null}
+
+        {params?.saved === "subadmin" ? (
+          <div className="rounded-[28px] border border-emerald-200 bg-emerald-50 p-5 text-sm font-bold leading-7 text-emerald-900">
+            חשבון Sub-Admin נוצר בהצלחה.
+          </div>
+        ) : null}
+
+        {params?.saved === "subadmin-removed" ? (
+          <div className="rounded-[28px] border border-amber-200 bg-amber-50 p-5 text-sm font-bold leading-7 text-amber-900">
+            הרשאות ה-Sub-Admin בוטלו.
+          </div>
+        ) : null}
+
+        {params?.error === "subadmin-invalid" ? (
+          <div className="rounded-[28px] border border-red-200 bg-red-50 p-5 text-sm font-bold leading-7 text-red-800">
+            נא למלא שם, מייל וסיסמה תקינה (אנגלית ומספרים בלבד, 8 תווים לפחות).
+          </div>
+        ) : null}
+
+        {params?.error === "subadmin-protected" ? (
+          <div className="rounded-[28px] border border-red-200 bg-red-50 p-5 text-sm font-bold leading-7 text-red-800">
+            לא ניתן לשנות את חשבון המנהל הראשי.
+          </div>
+        ) : null}
+
+        <section className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]" id="team">
+          <div className="rounded-[32px] bg-white p-6 shadow-sm">
+            <p className="text-sm font-black text-indigo-700">ניהול צוות</p>
+            <h2 className="mt-2 text-2xl font-black text-slate-950">הוספת Sub-Admin</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+              Sub-Admin יכול לנהל לקוחות VIP, לבנות פלואים ולראות אנליטיקות. אינו יכול למחוק מנהלים, לשנות חיוב, או לגשת לחשבון המנהל הראשי.
+            </p>
+            <form action={createSubAdminAction} className="mt-5 grid gap-3 md:grid-cols-2">
+              <Field label="שם מלא">
+                <input className={inputClass()} name="fullName" required />
+              </Field>
+              <Field label="אימייל">
+                <input className={inputClass()} dir="ltr" name="email" required type="email" />
+              </Field>
+              <Field label="סיסמה (אנגלית בלבד, 8+ תווים)">
+                <input
+                  className={inputClass()}
+                  dir="ltr"
+                  minLength={8}
+                  name="password"
+                  pattern="[A-Za-z0-9]+"
+                  placeholder="Password123"
+                  required
+                  title="אנגלית ומספרים בלבד, 8+ תווים"
+                  type="password"
+                />
+              </Field>
+              <div className="flex items-end">
+                <button className="h-11 w-full rounded-2xl bg-indigo-600 px-5 font-black text-white transition hover:-translate-y-0.5" type="submit">
+                  צור Sub-Admin
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <div className="rounded-[32px] bg-white p-6 shadow-sm">
+            <h2 className="text-2xl font-black text-slate-950">חברי צוות פעילים</h2>
+            <div className="mt-5 space-y-3">
+              {subAdmins.length === 0 ? (
+                <p className="rounded-2xl bg-slate-50 p-5 text-slate-500">אין עדיין חברי צוות.</p>
+              ) : subAdmins.map((member: any) => {
+                const isPrimary = member.email.toLowerCase() === PRIMARY_SUPER_ADMIN;
+
+                return (
+                  <div className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 p-4" key={member.id}>
+                    <div>
+                      <p className="font-black text-slate-950">{member.fullName ?? member.name ?? member.email}</p>
+                      <p className="text-sm text-slate-500" dir="ltr">{member.email}</p>
+                      <span className={`mt-1 inline-block rounded-full px-3 py-1 text-xs font-black ${
+                        member.globalRole === "SUPER_ADMIN"
+                          ? "bg-violet-100 text-violet-800"
+                          : "bg-indigo-100 text-indigo-800"
+                      }`}>
+                        {member.globalRole === "SUPER_ADMIN" ? "Super Admin ראשי" : "Sub Admin"}
+                      </span>
+                    </div>
+                    {!isPrimary && member.globalRole !== "SUPER_ADMIN" ? (
+                      <form action={deleteSubAdminAction}>
+                        <input name="userId" type="hidden" value={member.id} />
+                        <button className="h-10 rounded-2xl border border-red-200 bg-red-50 px-4 text-sm font-black text-red-700 transition hover:bg-red-100" type="submit">
+                          בטל הרשאות
+                        </button>
+                      </form>
+                    ) : (
+                      <span className="rounded-2xl bg-slate-100 px-4 py-2 text-xs font-bold text-slate-500">מוגן</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
 
         <section className="grid gap-4 md:grid-cols-4">
           <div className="rounded-[28px] bg-white p-6 shadow-sm">

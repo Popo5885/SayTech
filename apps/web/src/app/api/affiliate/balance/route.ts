@@ -5,7 +5,7 @@ import { getBalance, getLedger } from "../../../../lib/affiliate-points";
 
 export async function GET() {
   const session = await auth();
-  const userId = (session?.user as any)?.id ? String((session.user as any).id) : null;
+  const userId = (session?.user as any)?.id ? String((session?.user as any).id) : null;
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const store = await getPrimaryStore();

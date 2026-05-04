@@ -13,4 +13,25 @@ export function SuccessSubmitButton({
 }: {
   children: React.ReactNode;
   className?: string;
-  // When true the button coll
+  done?: boolean;
+}) {
+  const { pending } = useFormStatus();
+
+  return (
+    <button
+      className={`success-submit-btn ${className}`}
+      disabled={pending || done}
+      type="submit"
+    >
+      {done ? (
+        <span className="label flex items-center justify-center gap-2">
+          <Check className="h-4 w-4" />
+          {children}
+        </span>
+      ) : (
+        <span className="label">{pending ? "שולח..." : children}</span>
+      )}
+      <Check className="check-svg" />
+    </button>
+  );
+}

@@ -6,7 +6,7 @@ import { rateLimitByIpAndUser } from "../../../../lib/rate-limit";
 
 export async function POST(request: Request) {
   const session = await auth();
-  const userId = (session?.user as any)?.id ? String((session.user as any).id) : null;
+  const userId = (session?.user as any)?.id ? String((session?.user as any).id) : null;
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const tooMany = rateLimitByIpAndUser({ request, userId, scope: "affiliate-redeem", ipLimit: 5, userLimit: 10, windowMs: 60_000 });
