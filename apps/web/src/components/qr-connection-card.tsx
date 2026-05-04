@@ -96,6 +96,9 @@ export function QrConnectionCard({
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [isRequesting, setIsRequesting] = useState(false);
 
+  const pollInterval =
+    snapshot.workerOnline && snapshot.status !== "connected" ? 2000 : 5000;
+
   useEffect(() => {
     void fetchConnectionSnapshot(snapshot.connectionId).then((nextSnapshot) => {
       if (nextSnapshot) {
@@ -109,7 +112,8 @@ export function QrConnectionCard({
           startTransition(() => setSnapshot(nextSnapshot));
         }
       });
-    }, 5000);
+    }, pollInterval);
+
 
     const socket = getSocket();
 
@@ -137,11 +141,13 @@ export function QrConnectionCard({
     }
 
     return () => clearInterval(timer);
-  }, [snapshot.connectionId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [snapshot.connectionId, pollInterval]);
 
-  const showQr = Boolean(snapshot.workerOnline && snapshot.qrCode);
+  const validQr = Boolean(snapshot.qrCode?.startsWith("data:"));
+  const showQr = Boolean(snapshot.workerOnline && validQr);
   const showLoading =
-    Boolean(snapshot.workerOnline) && snapshot.status !== "connected" && !snapshot.qrCode;
+    Boolean(snapshot.workerOnline) && snapshot.status !== "connected" && !validQr;
   const clientLink = useMemo(
     () =>
       typeof window === "undefined"
@@ -339,6 +345,12 @@ export function QrConnectionCard({
             <img
               alt="סריקת WhatsApp QR"
               className="h-64 w-64 rounded-lg border border-stone-200 shadow-md"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).style.display = "none";
+                startTransition(() =>
+                  setSnapshot((s) => ({ ...s, qrCode: null }))
+                );
+              }}
               src={snapshot.qrCode ?? undefined}
             />
           ) : snapshot.status === "connected" ? (

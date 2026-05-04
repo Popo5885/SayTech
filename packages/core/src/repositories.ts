@@ -540,8 +540,8 @@ export class WhatsAppConnectionRepository {
 
   async regenerateQr(connectionId: string): Promise<WhatsAppConnection> {
     return this.updateSnapshot(connectionId, {
-      status: "qr_ready",
-      qrCode: `2@${generateReferralToken()}-${Date.now()}`,
+      status: "connecting",
+      qrCode: null,
       batteryLevel: null,
       phoneNumber: null,
       lastError: null
