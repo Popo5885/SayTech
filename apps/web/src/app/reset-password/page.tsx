@@ -1,18 +1,36 @@
 import Link from "next/link";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { KeyRound, ShieldCheck } from "lucide-react";
 import { prisma } from "@lottery/db";
 import { SuccessSubmitButton } from "../../components/success-submit-button";
 import { hashPassword, hashVerificationCode, isEnglishPassword } from "../../lib/password";
+import { rateLimit } from "../../lib/rate-limit";
 
 const db = prisma as any;
 
 async function verifyResetCodeAction(formData: FormData) {
   "use server";
 
+  // SECURITY: tight rate-limit on OTP verification — only ~10 attempts per
+  // 15 min per (ip + email) prevents brute-forcing the 6-digit code.
+  const requestHeaders = await headers();
+  const ip =
+    requestHeaders.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+    requestHeaders.get("x-real-ip") ??
+    "unknown";
+
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const code = String(formData.get("code") ?? "").trim();
+
+  const otpBucket = rateLimit({
+    key: `reset:verify:${ip}:${email}`,
+    limit: 10,
+    windowMs: 15 * 60_000
+  });
+  if (!otpBucket.ok) {
+    redirect(`/reset-password?email=${encodeURIComponent(email)}&error=rate`);
+  }
 
   if (!email || !code) {
     redirect(`/reset-password?email=${encodeURIComponent(email)}&error=missing`);

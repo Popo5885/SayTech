@@ -4,4 +4,46 @@ name: Deploy to Railway
 #   RAILWAY_TOKEN   — project token starting with "b971..." (rotate via Railway
 #                     -> Account -> Tokens whenever team membership changes).
 #   RAILWAY_SERVICE — UUID of the Railway service to deploy. Default fallback
-#                     below points at the production "web"
+#                     below points at the production "web" service.
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+# Default service id used when the RAILWAY_SERVICE secret is absent. Overriding
+# via the secret is preferred because it avoids leaking infra detail in source.
+env:
+  RAILWAY_SERVICE_DEFAULT: dd6fc038-74fa-42df-a30b-96e58283431d
+
+jobs:
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --prefer-offline --no-audit --no-fund
+      - run: npm --workspace @lottery/db run generate
+      - run: npx --workspace @lottery/core tsc -p packages/core/tsconfig.json --noEmit
+      - run: npx tsc -p apps/wa-worker/tsconfig.json --noEmit
+      - run: npx --workspace @lottery/web next typegen
+      - run: npx tsc -p apps/web/tsconfig.json --noEmit
+
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    needs: typecheck
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to Railway
+        uses: bervProject/railway-deploy@main
+        with:
+          railway_token: ${{ secrets.RAILWAY_TOKEN }}
+          service: ${{ secrets.RAILWAY_SERVICE != '' && secrets.RAILWAY_SERVICE || env.RAILWAY_SERVICE_DEFAULT }}

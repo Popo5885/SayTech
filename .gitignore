@@ -3,6 +3,7 @@
 .next_backup*/
 .turbo/
 .wwebjs_auth/
+.claude/
 dist/
 build/
 .env*

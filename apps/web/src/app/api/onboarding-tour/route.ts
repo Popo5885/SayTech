@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@lottery/db";
 import { auth } from "../../../auth";
+import { rateLimitByIpAndUser } from "../../../lib/rate-limit";
 
 const db = prisma as any;
 
@@ -79,6 +80,16 @@ export async function PATCH(request: Request) {
   if (!context) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const tooMany = rateLimitByIpAndUser({
+    request,
+    userId: context.userId,
+    scope: "onboarding-tour",
+    ipLimit: 30,
+    userLimit: 60,
+    windowMs: 60_000
+  });
+  if (tooMany) return tooMany;
 
   const body = (await request.json().catch(() => ({}))) as {
     step?: number;

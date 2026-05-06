@@ -13,25 +13,22 @@ export function SuccessSubmitButton({
 }: {
   children: React.ReactNode;
   className?: string;
+  // When true the button collapses to a green circle with a checkmark.
+  // Set this only after a confirmed 200-OK / success response from the server.
   done?: boolean;
 }) {
   const { pending } = useFormStatus();
+  const isDone = done && !pending;
 
   return (
     <button
-      className={`success-submit-btn ${className}`}
-      disabled={pending || done}
+      aria-label={isDone ? "הצלחה" : undefined}
+      className={`success-submit-btn ${isDone ? "done" : ""} ${className}`}
+      disabled={pending || isDone}
       type="submit"
     >
-      {done ? (
-        <span className="label flex items-center justify-center gap-2">
-          <Check className="h-4 w-4" />
-          {children}
-        </span>
-      ) : (
-        <span className="label">{pending ? "שולח..." : children}</span>
-      )}
-      <Check className="check-svg" />
+      <span className="label">{pending ? "שולח..." : children}</span>
+      <Check className="check-svg" aria-hidden="true" />
     </button>
   );
 }

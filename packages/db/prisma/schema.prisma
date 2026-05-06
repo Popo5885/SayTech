@@ -26,7 +26,6 @@ enum AccountStatus {
 
 enum GlobalRole {
   SUPER_ADMIN
-  SUB_ADMIN
   USER
 }
 
@@ -207,6 +206,8 @@ model Workspace {
   contactCards                WorkspaceContactCard[]
   automationRules             AutomationRule[]
   billingRecords              BillingRecord[]
+  affiliateReferralsMade      AffiliateReferral[] @relation("AffiliateReferrerWorkspace")
+  affiliateReferralsReceived  AffiliateReferral[] @relation("AffiliateReferredWorkspace")
   affiliatePointsLedger       AffiliatePointsLedger[]
   affiliatePointsBalance      AffiliatePointsBalance?
   affiliateRedemptions        AffiliateRedemption[]
@@ -516,18 +517,6 @@ model WhatsAppLoginCode {
   @@index([expiresAt])
 }
 
-model QrLoginSession {
-  id        String    @id @default(cuid())
-  token     String    @unique @default(cuid())
-  userId    String?
-  status    String    @default("pending")
-  expiresAt DateTime
-  createdAt DateTime  @default(now())
-
-  @@index([token])
-  @@index([expiresAt])
-}
-
 model ContactLead {
   id              String            @id @default(cuid())
   fullName        String
@@ -662,56 +651,92 @@ model WinnerDraw {
   @@index([participantId])
 }
 
-enum AffiliatePointsSource {
-  payment_webhook
-  manual_adjustment
-  referral_bonus
+// ── Affiliate & Points ────────────────────────────────────────────────────────
+
+/// Source of a points credit event.
+enum PointsSource {
+  payment_webhook   // 20 pts credited on verified payment (only source that grants points)
+  manual_admin      // manual grant by SUPER_ADMIN
+  referral_bonus    // future: bonus points for referral milestones
+  redemption         // debit when points are redeemed for invoice credit
 }
 
-enum AffiliateRedemptionStatus {
+enum AffiliateReferralStatus {
   pending
-  applied
-  cancelled
+  converted
+  paid
+  rejected
 }
 
-model AffiliatePointsLedger {
-  id              String                @id @default(cuid())
-  workspaceId     String
-  deltaPoints     Int
-  source          AffiliatePointsSource @default(payment_webhook)
-  billingRecordId String?
-  note            String?               @db.Text
-  createdAt       DateTime              @default(now())
-  workspace       Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+/// SaaS-level referral tracking between workspaces.
+/// Paid conversions can award 20 points through AffiliatePointsLedger.
+model AffiliateReferral {
+  id                  String                  @id @default(cuid())
+  referrerWorkspaceId String
+  referredWorkspaceId String?
+  referredEmail       String?
+  referralCode        String?
+  status              AffiliateReferralStatus @default(pending)
+  convertedAt         DateTime?
+  paidAt              DateTime?
+  pointsAwarded       Int                     @default(0)
+  billingRecordId     String?
+  metadata            Json?
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+  referrerWorkspace   Workspace               @relation("AffiliateReferrerWorkspace", fields: [referrerWorkspaceId], references: [id], onDelete: Cascade)
+  referredWorkspace   Workspace?              @relation("AffiliateReferredWorkspace", fields: [referredWorkspaceId], references: [id], onDelete: SetNull)
 
-  @@index([workspaceId])
-  @@index([workspaceId, createdAt])
+  @@index([referrerWorkspaceId])
+  @@index([referredWorkspaceId])
+  @@index([status])
+  @@index([referralCode])
   @@index([billingRecordId])
 }
 
-model AffiliatePointsBalance {
-  id          String    @id @default(cuid())
-  workspaceId String    @unique
-  totalPoints Int       @default(0)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+/// Immutable ledger row — one row per credit/debit event.
+model AffiliatePointsLedger {
+  id                    String       @id @default(cuid())
+  workspaceId           String
+  /// Positive = credit, negative = debit (redemption).
+  deltaPoints           Int
+  source                PointsSource
+  /// Links back to the BillingRecord that triggered this credit (payment_webhook only).
+  billingRecordId       String?
+  /// Optional note for audit / admin display.
+  note                  String?
+  createdAt             DateTime     @default(now())
+  workspace             Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId])
+  @@index([source])
+  @@index([createdAt])
+  @@index([billingRecordId])
 }
 
+/// Snapshot of a workspace's redeemable balance (updated transactionally).
+/// Formula: 100 points = 100 NIS discount on next invoice.
+model AffiliatePointsBalance {
+  workspaceId   String    @id
+  totalPoints   Int       @default(0)
+  updatedAt     DateTime  @updatedAt
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+/// Redemption requests (created when user requests a discount).
 model AffiliateRedemption {
-  id             String                    @id @default(cuid())
-  workspaceId    String
-  pointsRedeemed Int
-  discountAgorot Int
-  status         AffiliateRedemptionStatus @default(pending)
-  note           String?                   @db.Text
-  createdAt      DateTime                  @default(now())
-  updatedAt      DateTime                  @updatedAt
-  workspace      Workspace                 @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  id               String    @id @default(cuid())
+  workspaceId      String
+  pointsRedeemed   Int
+  /// Amount in agorot (Israeli cents). 100 pts → 10000 agorot = 100 NIS.
+  discountAgorot   Int
+  status           String    @default("pending") // pending | applied | cancelled
+  billingRecordId  String?   // linked when discount is applied to an invoice
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId])
-  @@index([workspaceId, status])
+  @@index([status])
   @@index([createdAt])
-}
+}

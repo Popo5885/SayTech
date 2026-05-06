@@ -1,5 +1,6 @@
 import net from "node:net";
 import tls from "node:tls";
+import { maskEmail } from "@lottery/core";
 import { getSmtpConfig, type SmtpConfig } from "./email-settings";
 
 type SendEmailInput = {
@@ -183,7 +184,9 @@ export async function sendSystemEmail(input: SendEmailInput): Promise<boolean> {
   const config = await getSmtpConfig();
 
   if (!config) {
-    console.info(`[email:skipped] ${input.to} - ${input.subject}`);
+    // SECURITY: mask the recipient address — log streams are often shipped
+    // to third-party aggregators (Logtail, Datadog, etc.).
+    console.info(`[email:skipped] ${maskEmail(input.to)} - ${input.subject}`);
     return false;
   }
 

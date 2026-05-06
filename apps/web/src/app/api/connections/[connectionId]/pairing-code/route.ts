@@ -1,11 +1,19 @@
 import { NextResponse } from "next/server";
 import { assertAdminConnectionAccess } from "../../../../../lib/live-store";
 
+// SECURITY: only allow safe identifier characters before forwarding to the worker
+// (prevents SSRF / path traversal via crafted connectionId).
+const SAFE_ID = /^[A-Za-z0-9_-]{8,64}$/;
+
 export async function POST(
   request: Request,
   context: { params: Promise<{ connectionId: string }> }
 ) {
   const { connectionId } = await context.params;
+
+  if (!SAFE_ID.test(connectionId)) {
+    return NextResponse.json({ error: "Invalid connection identifier." }, { status: 400 });
+  }
 
   try {
     await assertAdminConnectionAccess(connectionId);

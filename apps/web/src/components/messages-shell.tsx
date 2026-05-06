@@ -20,7 +20,7 @@ async function saveTemplates(
   templates: CampaignMessageTemplate[]
 ): Promise<void> {
   const response = await fetch(`/api/campaigns/${campaignId}/templates`, {
-    method: "PUT",
+    method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ templates })
   });

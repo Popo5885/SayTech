@@ -4,9 +4,10 @@ import { ArrowLeft, Sparkles } from "lucide-react";
 import { prisma } from "@lottery/db";
 import { signIn } from "../../auth";
 import { SuccessSubmitButton } from "../../components/success-submit-button";
-import { getAuthFeatureSettings, isGoogleLoginEnabled } from "../../lib/auth-settings";
+import { isGoogleOAuthConfigured } from "../../lib/auth-settings";
+import { registerSchema } from "../../lib/auth-schemas";
 import { ownerEmail, sendSystemEmail } from "../../lib/email";
-import { hashPassword, isEnglishPassword } from "../../lib/password";
+import { hashPassword } from "../../lib/password";
 import { normalizeIsraeliPhone } from "../../lib/phone";
 
 const db = prisma as any;
@@ -14,7 +15,7 @@ const db = prisma as any;
 async function googleRegisterAction() {
   "use server";
 
-  if (!(await isGoogleLoginEnabled())) {
+  if (!(await isGoogleOAuthConfigured())) {
     redirect("/register?error=google-config");
   }
 
@@ -24,16 +25,21 @@ async function googleRegisterAction() {
 async function registerAction(formData: FormData) {
   "use server";
 
-  const fullName = String(formData.get("fullName") ?? "").trim();
-  const email = String(formData.get("email") ?? "").trim().toLowerCase();
-  const password = String(formData.get("password") ?? "");
-  const phone = normalizeIsraeliPhone(String(formData.get("phone") ?? ""));
-  const accepted = formData.get("accepted") === "on";
+  const input = {
+    fullName: String(formData.get("fullName") ?? "").trim(),
+    email: String(formData.get("email") ?? "").trim().toLowerCase(),
+    password: String(formData.get("password") ?? ""),
+    phone: String(formData.get("phone") ?? ""),
+    accepted: formData.get("accepted") === "on"
+  };
+  const parsed = registerSchema.safeParse(input);
+  const phone = parsed.success ? normalizeIsraeliPhone(parsed.data.phone) : null;
 
-  if (!fullName || !email || !isEnglishPassword(password) || !phone || !accepted) {
-    redirect(`/register?error=missing&email=${encodeURIComponent(email)}`);
+  if (!parsed.success || !phone) {
+    redirect(`/register?error=missing&email=${encodeURIComponent(input.email)}`);
   }
 
+  const { fullName, email, password } = parsed.data;
   const now = new Date();
   const user = await db.user.upsert({
     where: { email },
@@ -85,14 +91,6 @@ export default async function RegisterPage({
   const hasError = params?.error === "missing";
   const hasGoogleConfigError = params?.error === "google-config";
   const initialEmail = params?.email ?? "";
-  // Same defensive pattern as /login: never crash registration because the DB
-  // is briefly unreachable or the schema isn't pushed yet.
-  let googleReady = false;
-  try {
-    googleReady = (await getAuthFeatureSettings()).googleLoginEnabled;
-  } catch (error) {
-    console.error("[register:settings-failed]", error);
-  }
 
   return (
     <main className="aurora-surface relative min-h-screen overflow-hidden bg-[#070914] px-4 py-10 text-white" dir="rtl">
@@ -140,32 +138,28 @@ export default async function RegisterPage({
 
           {hasError ? (
             <div className="mt-5 rounded-3xl border border-red-300/25 bg-red-300/12 p-4 text-sm font-semibold text-red-100">
-              צריך למלא שם, אימייל, סיסמה של 8 תווים לפחות, טלפון ואישור תנאים.
+              צריך למלא שם, אימייל, סיסמה באנגלית ומספרים בלבד של 8 תווים לפחות, טלפון ואישור תנאים.
             </div>
           ) : null}
 
           {hasGoogleConfigError ? (
             <div className="mt-5 rounded-3xl border border-amber-300/25 bg-amber-300/12 p-4 text-sm font-semibold text-amber-100">
-              הרשמה עם Google תופעל לאחר הגדרת GOOGLE_CLIENT_SECRET והפעלה בממשק הניהול.
+              הרשמה עם Google לא זמינה כרגע. יש לבדוק שהגדרות OAuth זמינות בסביבה.
             </div>
           ) : null}
 
-          {googleReady ? (
-            <>
-              <form action={googleRegisterAction} className="mt-6">
-                <button className="h-12 w-full rounded-2xl border border-white/10 bg-white text-sm font-black text-slate-950 transition hover:-translate-y-0.5" type="submit">
-                  הרשמה עם Google
-                </button>
-              </form>
-              <div className="my-6 flex items-center gap-3 text-sm text-slate-400">
-                <span className="h-px flex-1 bg-white/10" />
-                או הרשמה ידנית
-                <span className="h-px flex-1 bg-white/10" />
-              </div>
-            </>
-          ) : null}
+          <form action={googleRegisterAction} className="mt-6">
+            <button className="h-12 w-full rounded-2xl border border-white/10 bg-white text-sm font-black text-slate-950 transition hover:-translate-y-0.5" type="submit">
+              הרשמה עם Google
+            </button>
+          </form>
+          <div className="my-6 flex items-center gap-3 text-sm text-slate-400">
+            <span className="h-px flex-1 bg-white/10" />
+            או הרשמה ידנית
+            <span className="h-px flex-1 bg-white/10" />
+          </div>
 
-          <form action={registerAction} className={googleReady ? "space-y-4" : "mt-6 space-y-4"}>
+          <form action={registerAction} className="space-y-4">
             <label className="block">
               <span className="font-bold text-slate-200">שם מלא</span>
               <input className="mt-2 h-12 w-full rounded-2xl border border-white/10 bg-white/10 px-4 text-white outline-none transition focus:border-cyan-300 focus:shadow-[0_0_0_4px_rgba(34,211,238,0.12)]" name="fullName" required />

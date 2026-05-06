@@ -6,6 +6,7 @@ import { WorkspaceRepository } from "@lottery/core";
 import { prisma } from "@lottery/db";
 import type { NextAuthConfig } from "next-auth";
 import { isWhatsAppLoginEnabled } from "./lib/auth-settings";
+import { loginSchema } from "./lib/auth-schemas";
 import { getGoogleOAuthSettings } from "./lib/google-settings";
 import { normalizeIsraeliPhone } from "./lib/phone";
 import { hashPassword, hashVerificationCode, verifyPassword } from "./lib/password";
@@ -192,23 +193,26 @@ async function buildAuthConfig(): Promise<NextAuthConfig> {
           } as any;
         }
 
-        if (!email || !password) {
+        const loginInput = loginSchema.safeParse({ email, password });
+
+        if (!loginInput.success) {
           return null;
         }
 
-        const isSystemAdmin = email === SYSTEM_ADMIN_EMAIL;
-        let user = await db.user.findUnique({ where: { email } });
+        const { email: loginEmail, password: loginPassword } = loginInput.data;
+        const isSystemAdmin = loginEmail === SYSTEM_ADMIN_EMAIL;
+        let user = await db.user.findUnique({ where: { email: loginEmail } });
 
-        if (!user && isSystemAdmin && initialAdminPasswordMatches(password)) {
-          user = await createInitialAdminUser(email, password);
+        if (!user && isSystemAdmin && initialAdminPasswordMatches(loginPassword)) {
+          user = await createInitialAdminUser(loginEmail, loginPassword);
         }
 
-        const passwordIsValid = user ? verifyPassword(password, user.passwordHash) : false;
+        const passwordIsValid = user ? verifyPassword(loginPassword, user.passwordHash) : false;
         const shouldRepairSystemAdmin =
           Boolean(user) &&
           isSystemAdmin &&
           !passwordIsValid &&
-          initialAdminPasswordMatches(password);
+          initialAdminPasswordMatches(loginPassword);
 
         if (!user || (!passwordIsValid && !shouldRepairSystemAdmin)) {
           return null;
@@ -220,7 +224,7 @@ async function buildAuthConfig(): Promise<NextAuthConfig> {
             lastLoginAt: new Date(),
             ...(isSystemAdmin
               ? {
-                  ...(shouldRepairSystemAdmin ? { passwordHash: hashPassword(password) } : {}),
+                  ...(shouldRepairSystemAdmin ? { passwordHash: hashPassword(loginPassword) } : {}),
                   accountStatus: "active",
                   globalRole: "SUPER_ADMIN",
                   approvedAt: user.approvedAt ?? new Date()

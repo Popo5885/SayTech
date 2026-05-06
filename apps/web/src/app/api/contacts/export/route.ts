@@ -1,11 +1,31 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@lottery/db";
+import { auth } from "../../../../auth";
 import { buildVcf } from "../../../../lib/contact-bot";
 import { getPrimaryStore } from "../../../../lib/live-store";
+import { rateLimitByIpAndUser } from "../../../../lib/rate-limit";
 
 const db = prisma as any;
 
-export async function GET() {
+export async function GET(request: Request) {
+  // SECURITY: require an authenticated session before exporting PII.
+  const session = await auth();
+  const userId = (session?.user as any)?.id ? String((session?.user as any).id) : null;
+
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  }
+
+  const tooMany = rateLimitByIpAndUser({
+    request,
+    userId,
+    scope: "contacts-export",
+    ipLimit: 5,
+    userLimit: 10,
+    windowMs: 60_000
+  });
+  if (tooMany) return tooMany;
+
   const store = await getPrimaryStore();
 
   if (!store) {

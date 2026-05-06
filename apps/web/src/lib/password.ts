@@ -1,4 +1,4 @@
-import { createHash, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes, randomInt, scryptSync, timingSafeEqual } from "node:crypto";
 
 const KEY_LENGTH = 64;
 const ENGLISH_PASSWORD_PATTERN = /^[a-zA-Z0-9]+$/;
@@ -32,7 +32,8 @@ export function verifyPassword(password: string, storedHash: string | null | und
 }
 
 export function createVerificationCode(): string {
-  return String(Math.floor(100000 + Math.random() * 900000));
+  // SECURITY: use crypto-strong RNG (not Math.random) for OTP/reset codes.
+  return String(randomInt(100000, 1000000));
 }
 
 export function hashVerificationCode(code: string): string {

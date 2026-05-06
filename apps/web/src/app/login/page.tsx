@@ -6,7 +6,8 @@ import { prisma } from "@lottery/db";
 import { signIn } from "../../auth";
 import { SuccessSubmitButton } from "../../components/success-submit-button";
 import { QrLoginPanel } from "../../components/qr-login-panel";
-import { getAuthFeatureSettings, isGoogleLoginEnabled, isWhatsAppLoginEnabled } from "../../lib/auth-settings";
+import { getAuthFeatureSettings, isGoogleOAuthConfigured, isWhatsAppLoginEnabled } from "../../lib/auth-settings";
+import { loginSchema } from "../../lib/auth-schemas";
 import { normalizeIsraeliPhone } from "../../lib/phone";
 import { createVerificationCode, hashVerificationCode } from "../../lib/password";
 import { sendWhatsAppText } from "../../lib/whatsapp";
@@ -16,11 +17,20 @@ const db = prisma as any;
 async function loginAction(formData: FormData) {
   "use server";
 
-  const email = String(formData.get("email") ?? "").trim().toLowerCase();
-  const password = String(formData.get("password") ?? "");
-  const adminEmail = (process.env.SUPERADMIN_EMAIL ?? "aknvpupuch@gmail.com").toLowerCase();
+  const rawEmail = String(formData.get("email") ?? "").trim().toLowerCase();
   // Track consecutive failures so the client can auto-surface the Forgot-Password CTA.
   const prevAttempts = Math.max(0, parseInt(String(formData.get("attempts") ?? "0"), 10) || 0);
+  const parsed = loginSchema.safeParse({
+    email: rawEmail,
+    password: String(formData.get("password") ?? "")
+  });
+
+  if (!parsed.success) {
+    redirect(`/login?error=credentials&email=${encodeURIComponent(rawEmail)}&attempts=${prevAttempts + 1}`);
+  }
+
+  const { email, password } = parsed.data;
+  const adminEmail = (process.env.SUPERADMIN_EMAIL ?? "aknvpupuch@gmail.com").toLowerCase();
 
   try {
     await signIn("credentials", {
@@ -41,7 +51,7 @@ async function loginAction(formData: FormData) {
 async function googleAction() {
   "use server";
 
-  if (!(await isGoogleLoginEnabled())) {
+  if (!(await isGoogleOAuthConfigured())) {
     redirect("/login?error=google-config");
   }
 
@@ -167,7 +177,6 @@ export default async function LoginPage({
     infrastructureWarning =
       "המערכת לא הצליחה להגיע לבסיס הנתונים כרגע. אפשר לנסות להתחבר עם מייל וסיסמה — אם זה לא עובד, נסה שוב בעוד דקה.";
   }
-  const googleReady = authSettings.googleLoginEnabled;
   const whatsappReady = authSettings.whatsappLoginEnabled;
   const registerHref = triedEmail
     ? `/register?email=${encodeURIComponent(triedEmail)}`
@@ -250,7 +259,7 @@ export default async function LoginPage({
 
           {hasConfigError ? (
             <div className="mt-5 rounded-3xl border border-red-300/25 bg-red-300/12 p-4 text-sm font-semibold leading-7 text-red-100">
-              Google Login עדיין לא פעיל. צריך להגדיר GOOGLE_CLIENT_SECRET ולהפעיל את הכניסה דרך ממשק הניהול.
+              Google Login לא זמין כרגע. יש לבדוק שהגדרות OAuth זמינות בסביבה.
             </div>
           ) : null}
 
@@ -283,7 +292,7 @@ export default async function LoginPage({
             </label>
             <label className="block">
               <span className="font-bold text-slate-200">סיסמה</span>
-              <input className="mt-2 h-12 w-full rounded-2xl border border-white/10 bg-white/10 px-4 text-white outline-none transition focus:border-cyan-300 focus:shadow-[0_0_0_4px_rgba(34,211,238,0.12)]" name="password" required type="password" />
+              <input className="mt-2 h-12 w-full rounded-2xl border border-white/10 bg-white/10 px-4 text-white outline-none transition focus:border-cyan-300 focus:shadow-[0_0_0_4px_rgba(34,211,238,0.12)]" minLength={8} name="password" pattern="[A-Za-z0-9]+" required title="סיסמה באנגלית ומספרים בלבד" type="password" />
             </label>
             <div className="flex flex-wrap items-center gap-3">
               <SuccessSubmitButton>כניסה</SuccessSubmitButton>
@@ -297,17 +306,11 @@ export default async function LoginPage({
             <span className="h-px flex-1 bg-white/10" />
           </div>
 
-          {googleReady ? (
-            <form action={googleAction}>
-              <button className="h-12 w-full rounded-2xl border border-white/10 bg-white text-sm font-black text-slate-950 transition hover:-translate-y-0.5" type="submit">
-                כניסה עם Google
-              </button>
-            </form>
-          ) : (
-            <div className="rounded-2xl border border-white/10 bg-white/10 p-4 text-sm font-semibold leading-7 text-slate-200">
-              התחברות Google תופעל אחרי הגדרת GOOGLE_CLIENT_SECRET בסביבת השרת והפעלה בממשק הניהול.
-            </div>
-          )}
+          <form action={googleAction}>
+            <button className="h-12 w-full rounded-2xl border border-white/10 bg-white text-sm font-black text-slate-950 transition hover:-translate-y-0.5" type="submit">
+              כניסה עם Google
+            </button>
+          </form>
 
           {whatsappReady ? (
             <div className="mt-6 rounded-3xl border border-white/10 bg-white/[0.06] p-4">

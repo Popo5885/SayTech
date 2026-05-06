@@ -266,8 +266,8 @@ export default async function SettingsPage({
                 </div>
                 <form action={deleteContactCardAction}>
                   <input name="cardId" type="hidden" value={card.id} />
-                  <button className="h-10 rounded-2xl border border-red-200 bg-red-50 px-4 text-sm font-black text-red-700 transition hover:bg-red-100" type="submit">
-                    מחק
+                  <button className="h-10 rounded-2xl border border-red-200 px-4 text-sm font-black text-red-700" type="submit">
+                    הסר
                   </button>
                 </form>
               </div>
@@ -276,34 +276,76 @@ export default async function SettingsPage({
         </div>
       </section>
 
-      {store ? (
-        <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
-          <p className="text-sm font-black text-violet-700">נקודות שותפים</p>
-          <h2 className="mt-2 text-3xl font-black text-slate-950">יתרת נקודות</h2>
-          <p className="mt-3 max-w-2xl leading-7 text-slate-500">
-            על כל תשלום שאושר בוובהוק נזכים 20 נקודות. 100 נקודות = הנחה של 100 ₪.
-          </p>
+      {/* ── Affiliate & Points ─────────────────────────────────────────── */}
+      <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
+        <p className="text-sm font-black text-violet-700">נקודות שותפים</p>
+        <h2 className="mt-2 text-3xl font-black text-slate-950">יתרת נקודות</h2>
+        <p className="mt-3 max-w-2xl leading-7 text-slate-500">
+          על כל תשלום מאומת מתווספות {20} נקודות לחשבון. כל {POINTS_PER_NIS_DISCOUNT} נקודות שוות הנחה של {POINTS_PER_NIS_DISCOUNT} ₪ על החשבונית הבאה.
+        </p>
 
-          <div className="mt-5 rounded-2xl border border-violet-100 bg-violet-50 p-5">
-            <p className="text-sm font-black text-violet-700">יתרה נוכחית</p>
-            <p className="mt-2 text-4xl font-black text-violet-950">{pointsBalance} נקודות</p>
+        <div className="mt-6 flex flex-wrap items-center gap-6">
+          <div className="rounded-2xl border border-violet-200 bg-violet-50 px-8 py-5 text-center">
+            <p className="text-4xl font-black text-violet-900">{pointsBalance}</p>
+            <p className="mt-1 text-sm font-bold text-violet-600">נקודות זמינות</p>
           </div>
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-8 py-5 text-center">
+            <p className="text-4xl font-black text-emerald-900">
+              {Math.floor(pointsBalance / POINTS_PER_NIS_DISCOUNT) * POINTS_PER_NIS_DISCOUNT}
+            </p>
+            <p className="mt-1 text-sm font-bold text-emerald-600">נקודות לממש (₪)</p>
+          </div>
+        </div>
 
-          {pointsLedger.length > 0 ? (
-            <div className="mt-5 space-y-2">
-              <p className="text-sm font-black text-slate-700">היסטוריית נקודות</p>
-              {pointsLedger.map((entry: any) => (
-                <div className="flex items-center justify-between rounded-2xl bg-slate-50 p-3 text-sm" key={entry.id}>
-                  <span className="text-slate-600">{entry.note ?? entry.source}</span>
-                  <span className={`font-black ${entry.deltaPoints > 0 ? "text-emerald-700" : "text-red-700"}`}>
-                    {entry.deltaPoints > 0 ? "+" : ""}{entry.deltaPoints}
+        {pointsBalance >= POINTS_PER_NIS_DISCOUNT ? (
+          <form
+            action={async (formData: FormData) => {
+              "use server";
+              const sess = await auth();
+              const uid = (sess?.user as any)?.id;
+              if (!uid) redirect("/login");
+              const ws = await getPrimaryStore();
+              if (!ws) redirect("/dashboard/settings?error=workspace");
+              const pts = Math.floor(pointsBalance / POINTS_PER_NIS_DISCOUNT) * POINTS_PER_NIS_DISCOUNT;
+              try {
+                await redeemPoints(ws.workspace.id, pts);
+              } catch {
+                /* balance shown will update on next load */
+              }
+              revalidatePath("/dashboard/settings");
+              redirect("/dashboard/settings?saved=points");
+            }}
+            className="mt-5"
+          >
+            <button
+              className="h-12 rounded-2xl bg-violet-600 px-6 font-black text-white transition hover:-translate-y-0.5 hover:bg-violet-700"
+              type="submit"
+            >
+              ממש {Math.floor(pointsBalance / POINTS_PER_NIS_DISCOUNT) * POINTS_PER_NIS_DISCOUNT} נקודות ← הנחה של {Math.floor(pointsBalance / POINTS_PER_NIS_DISCOUNT) * POINTS_PER_NIS_DISCOUNT} ₪
+            </button>
+          </form>
+        ) : (
+          <p className="mt-4 text-sm text-slate-400">
+            נדרשות לפחות {POINTS_PER_NIS_DISCOUNT} נקודות למימוש. צבר עוד {POINTS_PER_NIS_DISCOUNT - pointsBalance} נקודות.
+          </p>
+        )}
+
+        {pointsLedger.length > 0 ? (
+          <div className="mt-6">
+            <p className="mb-3 text-sm font-black text-slate-700">היסטוריית נקודות</p>
+            <div className="space-y-2">
+              {(pointsLedger as any[]).map((row: any) => (
+                <div className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50 px-4 py-2.5" key={row.id}>
+                  <span className="text-sm text-slate-600">{row.note ?? row.source}</span>
+                  <span className={`text-sm font-black ${row.deltaPoints > 0 ? "text-emerald-700" : "text-red-600"}`}>
+                    {row.deltaPoints > 0 ? "+" : ""}{row.deltaPoints}
                   </span>
                 </div>
               ))}
             </div>
-          ) : null}
-        </section>
-      ) : null}
+          </div>
+        ) : null}
+      </section>
     </main>
   );
 }

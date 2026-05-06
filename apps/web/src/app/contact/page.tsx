@@ -1,65 +1,15 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { Mail, MessageCircle, ShieldCheck, Sparkles } from "lucide-react";
-import { prisma } from "@lottery/db";
 import { ContactForm } from "../../components/contact-form";
-import { ownerEmail, sendSystemEmail } from "../../lib/email";
-import { normalizeIsraeliPhone } from "../../lib/phone";
-
-const db = prisma as any;
-
-async function contactAction(formData: FormData) {
-  "use server";
-
-  const fullName = String(formData.get("fullName") ?? "").trim();
-  const email = String(formData.get("email") ?? "").trim().toLowerCase();
-  const phone = normalizeIsraeliPhone(String(formData.get("phone") ?? ""));
-  const message = String(formData.get("message") ?? "").trim();
-
-  if (!fullName || !email || !phone) {
-    redirect("/contact?error=missing");
-  }
-
-  await db.contactLead.create({
-    data: {
-      fullName,
-      email,
-      phone,
-      message,
-      acceptedTermsAt: new Date(),
-      acceptedPrivacyAt: new Date()
-    }
-  });
-
-  const baseUrl = process.env.PUBLIC_BASE_URL ?? "http://localhost:3000";
-
-  const [visitorMailSent, ownerMailSent] = await Promise.all([
-    sendSystemEmail({
-      to: email,
-      subject: "קיבלנו את הפנייה שלך ל-Magic Flow",
-      html: `<h1>הפנייה התקבלה</h1><p>שלום ${fullName}, תודה שפנית לצוות Magic Flow.</p><p>הפנייה נשמרה כליד עסקי, וצוות התמיכה יחזור אליך בהקדם עם מענה מסודר.</p>`
-    }),
-    sendSystemEmail({
-      to: ownerEmail(),
-      subject: "ליד חדש מ-Magic Flow",
-      html: `<h1>ליד חדש מצור קשר</h1><p><strong>${fullName}</strong></p><p>${email}</p><p dir="ltr">${phone}</p><p>${message || "לא נכתבה הודעה."}</p><p><a href="${baseUrl}/admin">מעבר ללוח הניהול</a></p>`
-    })
-  ]);
-
-  if (!visitorMailSent || !ownerMailSent) {
-    console.error("[contact:email-failed]", { visitorMailSent, ownerMailSent, leadEmail: email });
-  }
-
-  redirect(`/contact?sent=1${visitorMailSent && ownerMailSent ? "" : "&mail=0"}`);
-}
 
 export default async function ContactPage({
   searchParams
 }: {
-  searchParams?: Promise<{ sent?: string; mail?: string }>;
+  searchParams?: Promise<{ sent?: string; error?: string; mail?: string }>;
 }) {
   const params = await searchParams;
   const sent = params?.sent === "1";
+  const hasError = params?.error === "missing";
   const mailFailed = params?.mail === "0";
 
   return (
@@ -88,13 +38,14 @@ export default async function ContactPage({
             בלי לפתוח חשבון מיותר.
           </h1>
           <p className="mt-5 max-w-xl text-lg leading-8 text-slate-300">
-            השאירו פרטים ונחזור אליכם עם הסבר קצר וברור. הפנייה נשמרת כליד עסקי בלבד, ולא יוצרת חשבון פעיל במערכת.
+            השאירו פרטים ונחזור אליכם עם הסבר קצר וברור. הפנייה נשמרת כליד עסקי בלבד,
+            ולא יוצרת חשבון פעיל במערכת.
           </p>
 
           <div className="mt-8 grid gap-3 text-sm text-slate-300">
             <div className="rounded-3xl border border-white/10 bg-white/[0.05] p-4">
               <ShieldCheck className="mb-3 h-5 w-5 text-emerald-300" />
-              בדיקה ידנית לפני פתיחת מערכת עבודה, כדי לשמור על איכות הלקוחות והתשתית.
+              בדיקה ידנית לפני פתיחת סביבת עבודה, כדי לשמור על איכות הלקוחות והתשתית.
             </div>
             <div className="rounded-3xl border border-white/10 bg-white/[0.05] p-4">
               <MessageCircle className="mb-3 h-5 w-5 text-cyan-200" />
@@ -116,21 +67,7 @@ export default async function ContactPage({
             </div>
           </div>
 
-          {sent ? (
-            <div className="mt-6 rounded-3xl border border-emerald-300/25 bg-emerald-300/12 p-5 text-emerald-50">
-              <p className="font-black">הפנייה נשלחה בהצלחה.</p>
-              <p className="mt-2 text-sm leading-6 text-emerald-100">
-                צוות Magic Flow יחזור אליך בהקדם.
-              </p>
-              {mailFailed ? (
-                <p className="mt-3 rounded-2xl border border-amber-200/30 bg-amber-200/15 p-3 text-sm font-bold leading-6 text-amber-50">
-                  הפנייה נשמרה במערכת. מייל האישור לא יצא כי הגדרות SMTP עדיין לא מלאות.
-                </p>
-              ) : null}
-            </div>
-          ) : (
-            <ContactForm action={contactAction} mailFailed={mailFailed} />
-          )}
+          <ContactForm initialMailFailed={mailFailed} initialSent={sent} showInitialError={hasError} />
         </section>
       </div>
     </main>

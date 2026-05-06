@@ -108,7 +108,7 @@ export async function redeemPoints(
       data: {
         workspaceId,
         deltaPoints: -pointsToRedeem,
-        source: "payment_webhook", // debit uses same enum but note clarifies
+        source: "redemption",
         note: `מימוש ${pointsToRedeem} נקודות ← הנחה של ${discountNis} ₪`
       }
     });

@@ -1,152 +1,208 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState, type FormEvent } from "react";
+import { Check } from "lucide-react";
 
-type FieldErrors = {
-  fullName?: string;
-  email?: string;
-  phone?: string;
-  accepted?: string;
+type ContactValues = {
+  fullName: string;
+  email: string;
+  phone: string;
+  message: string;
+  accepted: boolean;
 };
 
-function isValidEmail(value: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+type ContactField = keyof ContactValues | "form";
+type FieldErrors = Partial<Record<ContactField, string>>;
+
+const initialValues: ContactValues = {
+  fullName: "",
+  email: "",
+  phone: "",
+  message: "",
+  accepted: false
+};
+
+const inputClass =
+  "mt-2 h-12 w-full rounded-2xl border border-white/10 bg-white/10 px-4 text-white outline-none transition focus:border-cyan-300 focus:shadow-[0_0_0_4px_rgba(34,211,238,0.12)]";
+const errorClass = "mt-2 text-sm font-bold leading-6 text-red-200";
+
+function validate(values: ContactValues): FieldErrors {
+  const errors: FieldErrors = {};
+
+  if (!values.fullName.trim()) {
+    errors.fullName = "צריך למלא שם מלא.";
+  }
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email.trim())) {
+    errors.email = "צריך להזין אימייל תקין.";
+  }
+
+  if (values.phone.replace(/[^\d+]/g, "").length < 9) {
+    errors.phone = "צריך להזין מספר טלפון תקין.";
+  }
+
+  if (!values.accepted) {
+    errors.accepted = "צריך לאשר יצירת קשר ושמירת פרטים.";
+  }
+
+  return errors;
 }
 
-function isValidPhone(value: string) {
-  return /^0[0-9]{8,9}$/.test(value.replace(/[\s\-]/g, ""));
+function SuccessMessage({ mailFailed }: { mailFailed: boolean }) {
+  return (
+    <div className="mt-6 rounded-3xl border border-emerald-300/25 bg-emerald-300/12 p-5 text-emerald-50">
+      <p className="font-black">הפנייה נשלחה בהצלחה.</p>
+      <p className="mt-2 text-sm leading-6 text-emerald-100">
+        צוות Magic Flow יחזור אליך בהקדם.
+      </p>
+      {mailFailed ? (
+        <p className="mt-3 rounded-2xl border border-amber-200/30 bg-amber-200/15 p-3 text-sm font-bold leading-6 text-amber-50">
+          הפנייה נשמרה במערכת. מייל האישור לא יצא כי הגדרות SMTP עדיין לא מלאות.
+        </p>
+      ) : null}
+    </div>
+  );
 }
 
 export function ContactForm({
-  action,
-  mailFailed
+  initialSent = false,
+  initialMailFailed = false,
+  showInitialError = false
 }: {
-  action: (data: FormData) => Promise<void>;
-  mailFailed?: boolean;
+  initialSent?: boolean;
+  initialMailFailed?: boolean;
+  showInitialError?: boolean;
 }) {
-  const formRef = useRef<HTMLFormElement>(null);
-  const [errors, setErrors] = useState<FieldErrors>({});
-  const [submitting, setSubmitting] = useState(false);
+  const [values, setValues] = useState<ContactValues>(initialValues);
+  const [errors, setErrors] = useState<FieldErrors>(
+    showInitialError ? { form: "צריך למלא את כל שדות החובה." } : {}
+  );
+  const [pending, setPending] = useState(false);
+  const [sent, setSent] = useState(initialSent);
+  const [mailFailed, setMailFailed] = useState(initialMailFailed);
 
-  function validate(form: HTMLFormElement): FieldErrors {
-    const errs: FieldErrors = {};
-    const fullName = (form.elements.namedItem("fullName") as HTMLInputElement)?.value.trim();
-    const email = (form.elements.namedItem("email") as HTMLInputElement)?.value.trim();
-    const phone = (form.elements.namedItem("phone") as HTMLInputElement)?.value.trim();
-    const accepted = (form.elements.namedItem("accepted") as HTMLInputElement)?.checked;
-
-    if (!fullName) errs.fullName = "נדרש שם מלא";
-    if (!email) errs.email = "נדרש אימייל";
-    else if (!isValidEmail(email)) errs.email = "כתובת אימייל לא תקינה";
-    if (!phone) errs.phone = "נדרש מספר טלפון";
-    else if (!isValidPhone(phone)) errs.phone = "מספר טלפון לא תקין";
-    if (!accepted) errs.accepted = "יש לסמן אישור יצירת קשר";
-
-    return errs;
+  function update<K extends keyof ContactValues>(key: K, value: ContactValues[K]) {
+    setValues((current) => ({ ...current, [key]: value }));
+    setErrors((current) => ({ ...current, [key]: undefined, form: undefined }));
   }
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const form = e.currentTarget;
-    const errs = validate(form);
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const clientErrors = validate(values);
 
-    if (Object.keys(errs).length > 0) {
-      setErrors(errs);
+    if (Object.keys(clientErrors).length > 0) {
+      setErrors(clientErrors);
       return;
     }
 
+    setPending(true);
     setErrors({});
-    setSubmitting(true);
 
-    const data = new FormData(form);
-    await action(data);
-    setSubmitting(false);
+    try {
+      const response = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(values)
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        fieldErrors?: FieldErrors;
+        mailSent?: boolean;
+      };
+
+      if (!response.ok) {
+        setErrors(payload.fieldErrors ?? { form: payload.error ?? "שליחת הפנייה נכשלה." });
+        return;
+      }
+
+      setMailFailed(payload.mailSent === false);
+      setSent(true);
+    } catch {
+      setErrors({ form: "שליחת הפנייה נכשלה. הפרטים נשארו בטופס ואפשר לנסות שוב." });
+    } finally {
+      setPending(false);
+    }
   }
 
-  const inputClass =
-    "mt-2 h-12 w-full rounded-2xl border border-white/10 bg-white/10 px-4 text-white outline-none transition focus:border-cyan-300 focus:shadow-[0_0_0_4px_rgba(34,211,238,0.12)]";
-  const errorClass = "mt-1 text-sm font-semibold text-red-400";
+  if (sent) {
+    return <SuccessMessage mailFailed={mailFailed} />;
+  }
 
   return (
-    <form ref={formRef} className="mt-6 space-y-4" onSubmit={handleSubmit} noValidate>
-      {mailFailed && (
-        <p className="rounded-2xl border border-amber-200/30 bg-amber-200/15 p-3 text-sm font-bold leading-6 text-amber-50">
-          הפנייה נשמרה במערכת. מייל האישור לא יצא כי הגדרות SMTP עדיין לא מלאות.
-        </p>
-      )}
+    <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
+      {errors.form ? (
+        <div className="rounded-2xl border border-red-300/25 bg-red-300/12 p-4 text-sm font-semibold text-red-100">
+          {errors.form}
+        </div>
+      ) : null}
 
-      <div>
-        <label className="block">
-          <span className="font-bold text-slate-200">שם מלא</span>
-          <input
-            className={inputClass}
-            name="fullName"
-            onChange={() => errors.fullName && setErrors(p => ({ ...p, fullName: undefined }))}
-            type="text"
-          />
-        </label>
-        {errors.fullName && <p className={errorClass}>{errors.fullName}</p>}
-      </div>
+      <label className="block">
+        <span className="font-bold text-slate-200">שם מלא</span>
+        <input
+          className={inputClass}
+          name="fullName"
+          onChange={(event) => update("fullName", event.target.value)}
+          value={values.fullName}
+        />
+        {errors.fullName ? <p className={errorClass}>{errors.fullName}</p> : null}
+      </label>
 
-      <div>
-        <label className="block">
-          <span className="font-bold text-slate-200">אימייל</span>
-          <input
-            className={inputClass}
-            dir="ltr"
-            name="email"
-            onChange={() => errors.email && setErrors(p => ({ ...p, email: undefined }))}
-            type="email"
-          />
-        </label>
-        {errors.email && <p className={errorClass}>{errors.email}</p>}
-      </div>
+      <label className="block">
+        <span className="font-bold text-slate-200">אימייל</span>
+        <input
+          className={inputClass}
+          dir="ltr"
+          name="email"
+          onChange={(event) => update("email", event.target.value)}
+          type="email"
+          value={values.email}
+        />
+        {errors.email ? <p className={errorClass}>{errors.email}</p> : null}
+      </label>
 
-      <div>
-        <label className="block">
-          <span className="font-bold text-slate-200">טלפון</span>
-          <input
-            className={inputClass}
-            dir="ltr"
-            name="phone"
-            onChange={() => errors.phone && setErrors(p => ({ ...p, phone: undefined }))}
-            placeholder="0501234567"
-            type="tel"
-          />
-        </label>
-        {errors.phone && <p className={errorClass}>{errors.phone}</p>}
-      </div>
+      <label className="block">
+        <span className="font-bold text-slate-200">טלפון</span>
+        <input
+          className={`${inputClass} text-left placeholder:text-slate-500`}
+          dir="ltr"
+          name="phone"
+          onChange={(event) => update("phone", event.target.value)}
+          placeholder="0501234567"
+          value={values.phone}
+        />
+        {errors.phone ? <p className={errorClass}>{errors.phone}</p> : null}
+      </label>
 
-      <div>
-        <label className="block">
-          <span className="font-bold text-slate-200">מה חשוב לך במערכת?</span>
-          <textarea
-            className="mt-2 min-h-32 w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300 focus:shadow-[0_0_0_4px_rgba(34,211,238,0.12)]"
-            name="message"
-            placeholder="לדוגמה: הגרלה, שמירת אנשי קשר, WhatsApp Official, קבלות או אוטומציות."
-          />
-        </label>
-      </div>
+      <label className="block">
+        <span className="font-bold text-slate-200">מה חשוב לך במערכת?</span>
+        <textarea
+          className="mt-2 min-h-32 w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300 focus:shadow-[0_0_0_4px_rgba(34,211,238,0.12)]"
+          name="message"
+          onChange={(event) => update("message", event.target.value)}
+          placeholder="לדוגמה: הגרלה, שמירת אנשי קשר, WhatsApp Official, קבלות או אוטומציות."
+          value={values.message}
+        />
+      </label>
 
-      <div>
-        <label className="flex items-start gap-3 rounded-3xl border border-white/10 bg-white/[0.06] p-4 text-sm leading-6 text-slate-300">
-          <input
-            className="mt-1"
-            name="accepted"
-            onChange={() => errors.accepted && setErrors(p => ({ ...p, accepted: undefined }))}
-            type="checkbox"
-          />
-          <span>אני מאשר יצירת קשר ושמירת הפרטים לצורך טיפול בפנייה.</span>
-        </label>
-        {errors.accepted && <p className={errorClass}>{errors.accepted}</p>}
-      </div>
+      <label className="flex items-start gap-3 rounded-3xl border border-white/10 bg-white/[0.06] p-4 text-sm leading-6 text-slate-300">
+        <input
+          checked={values.accepted}
+          className="mt-1"
+          name="accepted"
+          onChange={(event) => update("accepted", event.target.checked)}
+          type="checkbox"
+        />
+        <span>אני מאשר יצירת קשר ושמירת הפרטים לצורך טיפול בפנייה.</span>
+      </label>
+      {errors.accepted ? <p className={errorClass}>{errors.accepted}</p> : null}
 
       <button
-        className="h-12 w-full rounded-2xl bg-gradient-to-br from-cyan-300 to-violet-500 text-sm font-black text-white shadow-[0_0_35px_rgba(34,211,238,0.20)] transition hover:-translate-y-0.5 disabled:opacity-60"
-        disabled={submitting}
+        className={`success-submit-btn ${sent ? "done" : ""}`}
+        disabled={pending}
         type="submit"
       >
-        {submitting ? "שולח..." : "שליחת פרטים"}
+        <span className="label">{pending ? "שולח..." : "שליחת פרטים"}</span>
+        <Check className="check-svg" aria-hidden="true" />
       </button>
     </form>
   );

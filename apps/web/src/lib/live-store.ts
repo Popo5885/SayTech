@@ -91,7 +91,7 @@ function isSuperAdmin(session: any): boolean {
 }
 
 function sessionUserId(session: any): string | null {
-  return session?.user?.id ? String(session.user.id) : null;
+  return session?.user?.id ? String(session?.user?.id) : null;
 }
 
 async function assertCampaignAccess(campaignId: string, write = false) {
@@ -511,7 +511,14 @@ export async function getPublicCampaign(slug: string) {
     campaign,
     whatsappPhone: assignment?.connection?.phoneNumber ?? connection?.phoneNumber ?? workspace?.phoneNumber ?? null,
     totalParticipants: leaderboard.length,
-    leaderboard: leaderboard.slice(0, 10)
+    // SECURITY: strip PII (full name + personal referral link) from public leaderboard.
+    leaderboard: leaderboard.slice(0, 10).map((entry) => ({
+      participantId: entry.participantId,
+      anonymizedName: entry.anonymizedName,
+      rank: entry.rank,
+      referralsCount: entry.referralsCount,
+      tickets: entry.tickets
+    }))
   };
 }
 

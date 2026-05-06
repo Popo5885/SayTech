@@ -1077,10 +1077,44 @@ export class CampaignRepository {
     connectionId: string,
     messageBody: string
   ): Promise<Campaign | null> {
+    const connection = await db.whatsAppConnection.findUnique({
+      where: {
+        id: connectionId
+      },
+      select: {
+        workspaceId: true,
+        maxTenants: true
+      }
+    });
+
+    if (!connection) {
+      return null;
+    }
+
+    const tenantLimit = Math.max(1, connection.maxTenants ?? 3);
+    const assignments = await db.workspaceConnectionAssignment.findMany({
+      where: {
+        connectionId,
+        status: "active"
+      },
+      orderBy: {
+        assignedAt: "asc"
+      },
+      select: {
+        workspaceId: true
+      },
+      take: tenantLimit
+    });
+    const routableWorkspaceIds = Array.from(
+      new Set([connection.workspaceId, ...assignments.map((assignment: any) => assignment.workspaceId)])
+    ).slice(0, tenantLimit);
     const campaigns = await db.campaign.findMany({
       where: {
         connectionId,
-        isActive: true
+        isActive: true,
+        workspaceId: {
+          in: routableWorkspaceIds
+        }
       },
       include: {
         templates: true

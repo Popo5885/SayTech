@@ -1,20 +1,44 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { Mail } from "lucide-react";
 import { prisma } from "@lottery/db";
 import { SuccessSubmitButton } from "../../components/success-submit-button";
 import { sendSystemEmail } from "../../lib/email";
 import { createVerificationCode, hashVerificationCode } from "../../lib/password";
+import { rateLimit } from "../../lib/rate-limit";
 
 const db = prisma as any;
 
 async function forgotPasswordAction(formData: FormData) {
   "use server";
 
+  // SECURITY: rate-limit reset attempts per IP and per email to slow
+  // email-bombing and account enumeration.
+  const requestHeaders = await headers();
+  const ip =
+    requestHeaders.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+    requestHeaders.get("x-real-ip") ??
+    "unknown";
+
+  const ipBucket = rateLimit({ key: `forgot:ip:${ip}`, limit: 5, windowMs: 5 * 60_000 });
+  if (!ipBucket.ok) {
+    redirect("/forgot-password?error=rate");
+  }
+
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
 
   if (!email) {
     redirect("/forgot-password?error=missing");
+  }
+
+  const emailBucket = rateLimit({
+    key: `forgot:email:${email}`,
+    limit: 3,
+    windowMs: 60 * 60_000
+  });
+  if (!emailBucket.ok) {
+    redirect("/forgot-password?sent=1");
   }
 
   const user = await db.user.findUnique({ where: { email } });
@@ -49,7 +73,7 @@ async function forgotPasswordAction(formData: FormData) {
 export default async function ForgotPasswordPage({
   searchParams
 }: {
-  searchParams?: Promise<{ error?: string; email?: string; sent?: string }>;
+  searchParams?: Promise<{ error?: string; email?: string; sent?: string; rate?: string }>;
 }) {
   const params = await searchParams;
   const error = params?.error;
@@ -79,6 +103,11 @@ export default async function ForgotPasswordPage({
         {error === "missing" ? (
           <div className="mt-5 rounded-2xl border border-red-300/25 bg-red-300/12 p-4 text-sm font-semibold text-red-100">
             צריך להזין אימייל תקין.
+          </div>
+        ) : null}
+        {error === "rate" ? (
+          <div className="mt-5 rounded-2xl border border-amber-300/25 bg-amber-300/12 p-4 text-sm font-semibold text-amber-100">
+            יותר מדי בקשות מהכתובת הזאת. נסו שוב בעוד מספר דקות.
           </div>
         ) : null}
         {sent ? (

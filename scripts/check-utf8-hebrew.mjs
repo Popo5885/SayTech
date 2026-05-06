@@ -15,6 +15,7 @@ const scannedExtensions = new Set([
 ]);
 const ignoredDirectories = new Set([
   ".git",
+  ".claude",
   ".next",
   ".next_backup_20260425223826",
   ".turbo",
