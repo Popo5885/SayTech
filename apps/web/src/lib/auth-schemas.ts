@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 const englishPasswordMessage =
-  "Password must be 8+ characters and use English letters or numbers only.";
+  "Password must be 8+ characters and contain English letters or numbers only.";
 
 export const englishPasswordSchema = z
   .string()
