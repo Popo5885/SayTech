@@ -1,5 +1,8 @@
 {
   "$schema": "https://schema.railpack.com",
+  "build": {
+    "buildCommand": "npm run db:generate && npm run db:push:ci && npm run check:utf8 && turbo build --filter=@lottery/web"
+  },
   "deploy": {
     "startCommand": "npm run start"
   }
