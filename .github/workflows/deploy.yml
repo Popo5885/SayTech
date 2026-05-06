@@ -1,9 +1,9 @@
 name: Deploy to Railway
 
 # Triggered on every push to main. Requires two GitHub Actions secrets:
-#   RAILWAY_TOKEN   — project token starting with "b971..." (rotate via Railway
+#   RAILWAY_TOKEN   - project token starting with "b971..." (rotate via Railway
 #                     -> Account -> Tokens whenever team membership changes).
-#   RAILWAY_SERVICE — UUID of the Railway service to deploy. Default fallback
+#   RAILWAY_SERVICE - UUID of the Railway service to deploy. Default fallback
 #                     below points at the production "web" service.
 
 on:
@@ -29,10 +29,7 @@ jobs:
           cache: npm
       - run: npm ci --prefer-offline --no-audit --no-fund
       - run: npm --workspace @lottery/db run generate
-      - run: npx --workspace @lottery/core tsc -p packages/core/tsconfig.json --noEmit
-      - run: npx tsc -p apps/wa-worker/tsconfig.json --noEmit
-      - run: npx --workspace @lottery/web next typegen
-      - run: npx tsc -p apps/web/tsconfig.json --noEmit
+      - run: npm run typecheck
 
   deploy:
     name: Deploy
