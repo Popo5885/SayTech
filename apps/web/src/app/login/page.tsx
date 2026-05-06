@@ -5,6 +5,7 @@ import { ArrowLeft, Sparkles, AlertTriangle } from "lucide-react";
 import { prisma } from "@lottery/db";
 import { signIn } from "../../auth";
 import { SuccessSubmitButton } from "../../components/success-submit-button";
+import { QrLoginPanel } from "../../components/qr-login-panel";
 import { getAuthFeatureSettings, isGoogleLoginEnabled, isWhatsAppLoginEnabled } from "../../lib/auth-settings";
 import { normalizeIsraeliPhone } from "../../lib/phone";
 import { createVerificationCode, hashVerificationCode } from "../../lib/password";
@@ -193,7 +194,7 @@ export default async function LoginPage({
             התחברות פשוטה ללקוחות Magic Flow. אם החשבון עדיין ממתין לאישור, נעביר אותך למסך המתנה מסודר.
           </p>
           <div className="mt-8 rounded-3xl border border-emerald-300/20 bg-emerald-300/10 p-5 text-sm font-semibold leading-7 text-emerald-100">
-            אפשר להיכנס עם מייל וסיסמה, Google או קוד חד-פעמי ב-WhatsApp.
+            אפשר להיכנס עם מייל וסיסמה, Google, קוד חד-פעמי ב-WhatsApp — או סריקת QR ממכשיר נייד.
           </div>
         </section>
 
@@ -329,6 +330,8 @@ export default async function LoginPage({
               ) : null}
             </div>
           ) : null}
+
+          <QrLoginPanel />
 
           <p className="mt-6 text-sm text-slate-300">
             עדיין אין חשבון? <Link className="font-bold text-cyan-200 hover:text-white" href="/register">הרשמה</Link>

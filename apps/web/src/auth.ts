@@ -89,13 +89,57 @@ async function buildAuthConfig(): Promise<NextAuthConfig> {
         email: { label: "אימייל", type: "email" },
         password: { label: "סיסמה", type: "password" },
         phone: { label: "טלפון", type: "text" },
-        otpCode: { label: "קוד WhatsApp", type: "text" }
+        otpCode: { label: "קוד WhatsApp", type: "text" },
+        qrToken: { label: "QR Token", type: "text" }
       },
       async authorize(credentials) {
         const email = String(credentials?.email ?? "").trim().toLowerCase();
         const password = String(credentials?.password ?? "");
         const phone = normalizeIsraeliPhone(String(credentials?.phone ?? ""));
         const otpCode = String(credentials?.otpCode ?? "").trim();
+
+        const qrToken = String(credentials?.qrToken ?? "").trim();
+
+        if (qrToken) {
+          const qrSession = await db.qrLoginSession.findUnique({
+            where: { token: qrToken }
+          });
+
+          if (!qrSession || qrSession.status !== "authenticated" || !qrSession.userId) {
+            return null;
+          }
+
+          if (new Date() > qrSession.expiresAt) {
+            return null;
+          }
+
+          const qrUser = await db.user.findUnique({
+            where: { id: qrSession.userId }
+          });
+
+          if (!qrUser || qrUser.accountStatus !== "active") {
+            return null;
+          }
+
+          await Promise.all([
+            db.qrLoginSession.update({
+              where: { id: qrSession.id },
+              data: { status: "used" }
+            }),
+            db.user.update({
+              where: { id: qrUser.id },
+              data: { lastLoginAt: new Date() }
+            })
+          ]);
+
+          return {
+            id: qrUser.id,
+            email: qrUser.email,
+            name: qrUser.fullName ?? qrUser.name ?? qrUser.email,
+            accountStatus: qrUser.accountStatus,
+            globalRole: qrUser.globalRole
+          } as any;
+        }
 
         if (phone && otpCode) {
           if (!(await isWhatsAppLoginEnabled())) {

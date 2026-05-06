@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Mail, MessageCircle, ShieldCheck, Sparkles } from "lucide-react";
 import { prisma } from "@lottery/db";
-import { SuccessSubmitButton } from "../../components/success-submit-button";
+import { ContactForm } from "../../components/contact-form";
 import { ownerEmail, sendSystemEmail } from "../../lib/email";
 import { normalizeIsraeliPhone } from "../../lib/phone";
 
@@ -15,9 +15,8 @@ async function contactAction(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const phone = normalizeIsraeliPhone(String(formData.get("phone") ?? ""));
   const message = String(formData.get("message") ?? "").trim();
-  const accepted = formData.get("accepted") === "on";
 
-  if (!fullName || !email || !phone || !accepted) {
+  if (!fullName || !email || !phone) {
     redirect("/contact?error=missing");
   }
 
@@ -57,11 +56,10 @@ async function contactAction(formData: FormData) {
 export default async function ContactPage({
   searchParams
 }: {
-  searchParams?: Promise<{ sent?: string; error?: string; mail?: string }>;
+  searchParams?: Promise<{ sent?: string; mail?: string }>;
 }) {
   const params = await searchParams;
   const sent = params?.sent === "1";
-  const hasError = params?.error === "missing";
   const mailFailed = params?.mail === "0";
 
   return (
@@ -131,34 +129,7 @@ export default async function ContactPage({
               ) : null}
             </div>
           ) : (
-            <form action={contactAction} className="mt-6 space-y-4">
-              {hasError ? (
-                <div className="rounded-2xl border border-red-300/25 bg-red-300/12 p-4 text-sm font-semibold text-red-100">
-                  צריך למלא שם, אימייל, טלפון ואישור יצירת קשר.
-                </div>
-              ) : null}
-              <label className="block">
-                <span className="font-bold text-slate-200">שם מלא</span>
-                <input className="mt-2 h-12 w-full rounded-2xl border border-white/10 bg-white/10 px-4 text-white outline-none transition focus:border-cyan-300 focus:shadow-[0_0_0_4px_rgba(34,211,238,0.12)]" name="fullName" required />
-              </label>
-              <label className="block">
-                <span className="font-bold text-slate-200">אימייל</span>
-                <input className="mt-2 h-12 w-full rounded-2xl border border-white/10 bg-white/10 px-4 text-white outline-none transition focus:border-cyan-300 focus:shadow-[0_0_0_4px_rgba(34,211,238,0.12)]" dir="ltr" name="email" required type="email" />
-              </label>
-              <label className="block">
-                <span className="font-bold text-slate-200">טלפון</span>
-                <input className="mt-2 h-12 w-full rounded-2xl border border-white/10 bg-white/10 px-4 text-left text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300 focus:shadow-[0_0_0_4px_rgba(34,211,238,0.12)]" dir="ltr" name="phone" placeholder="0501234567" required />
-              </label>
-              <label className="block">
-                <span className="font-bold text-slate-200">מה חשוב לך במערכת?</span>
-                <textarea className="mt-2 min-h-32 w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300 focus:shadow-[0_0_0_4px_rgba(34,211,238,0.12)]" name="message" placeholder="לדוגמה: הגרלה, שמירת אנשי קשר, WhatsApp Official, קבלות או אוטומציות." />
-              </label>
-              <label className="flex items-start gap-3 rounded-3xl border border-white/10 bg-white/[0.06] p-4 text-sm leading-6 text-slate-300">
-                <input className="mt-1" name="accepted" required type="checkbox" />
-                <span>אני מאשר יצירת קשר ושמירת הפרטים לצורך טיפול בפנייה.</span>
-              </label>
-              <SuccessSubmitButton>שליחת פרטים</SuccessSubmitButton>
-            </form>
+            <ContactForm action={contactAction} mailFailed={mailFailed} />
           )}
         </section>
       </div>

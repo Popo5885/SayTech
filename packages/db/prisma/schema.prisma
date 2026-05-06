@@ -516,6 +516,18 @@ model WhatsAppLoginCode {
   @@index([expiresAt])
 }
 
+model QrLoginSession {
+  id        String    @id @default(cuid())
+  token     String    @unique @default(cuid())
+  userId    String?
+  status    String    @default("pending")
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+
+  @@index([token])
+  @@index([expiresAt])
+}
+
 model ContactLead {
   id              String            @id @default(cuid())
   fullName        String

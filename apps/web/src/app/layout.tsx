@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { AccessibilityWidget } from "../components/accessibility-widget";
 import { ConnectionRecoveryBanner } from "../components/connection-recovery-banner";
 import { CookieConsent } from "../components/cookie-consent";
 import { FacebookPixel } from "../components/facebook-pixel";
@@ -23,8 +22,6 @@ export default function RootLayout({
         {children}
         {/* Global connection recovery overlay — detects server/WS drops. */}
         <ConnectionRecoveryBanner />
-        {/* In-house accessibility helpers (always available, no JS needed). */}
-        <AccessibilityWidget />
         {/* UserWay third-party accessibility widget — loaded after interaction. */}
         <UserWayWidget />
         {/* Cookie consent banner. Marketing scripts wait for the consent event. */}
