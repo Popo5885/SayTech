@@ -149,7 +149,7 @@ export default async function RegisterPage({
           ) : null}
 
           <form action={googleRegisterAction} className="mt-6">
-            <button className="h-12 w-full rounded-2xl border border-white/10 bg-white text-sm font-black text-slate-950 transition hover:-translate-y-0.5" type="submit">
+            <button aria-label="Register with Google" className="h-12 w-full rounded-2xl border border-white/10 bg-white text-sm font-black text-slate-950 transition hover:-translate-y-0.5" type="submit">
               הרשמה עם Google
             </button>
           </form>
