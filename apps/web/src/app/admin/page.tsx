@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { encryptSecret } from "@lottery/core";
 import { prisma } from "@lottery/db";
+import { AccountStatus, ContactBotUpgradeStatus, ContactLeadStatus, GlobalRole } from "@prisma/client";
 import { auth } from "../../auth";
 import { AUTH_SETTING_KEYS, getAuthFeatureSettings, setAuthFeatureSetting } from "../../lib/auth-settings";
 import { ownerEmail, sendSystemEmail } from "../../lib/email";
@@ -892,9 +893,9 @@ export default async function AdminPage({
       upgradeRequests,
       subAdmins
     ] = await Promise.all([
-      db.user.findMany({ where: { accountStatus: "pending" }, orderBy: { createdAt: "desc" } }),
-      db.contactLead.findMany({ where: { status: "open" }, orderBy: { createdAt: "desc" } }),
-      db.user.count({ where: { accountStatus: "active" } }),
+      db.user.findMany({ where: { accountStatus: AccountStatus.pending }, orderBy: { createdAt: "desc" } }),
+      db.contactLead.findMany({ where: { status: ContactLeadStatus.open }, orderBy: { createdAt: "desc" } }),
+      db.user.count({ where: { accountStatus: AccountStatus.active } }),
       db.user.findMany({ orderBy: { createdAt: "desc" }, take: 100 }),
       db.workspace.findMany({ orderBy: { createdAt: "desc" }, take: 100 }),
       db.whatsAppConnection.findMany({ orderBy: { updatedAt: "desc" }, take: 50, include: { workspace: true } }),
@@ -902,8 +903,8 @@ export default async function AdminPage({
       db.emailBroadcast.findMany({ orderBy: { createdAt: "desc" }, take: 10 }),
       db.billingRecord.findMany({ orderBy: { createdAt: "desc" }, take: 20, include: { workspace: true } }),
       db.siteSetting.findMany(),
-      db.contactBotUpgradeRequest.findMany({ where: { status: "open" }, orderBy: { createdAt: "desc" }, take: 50, include: { workspace: true } }),
-      db.user.findMany({ where: { globalRole: { in: ["SUB_ADMIN", "SUPER_ADMIN"] } }, orderBy: { createdAt: "asc" } })
+      db.contactBotUpgradeRequest.findMany({ where: { status: ContactBotUpgradeStatus.open }, orderBy: { createdAt: "desc" }, take: 50, include: { workspace: true } }),
+      db.user.findMany({ where: { globalRole: GlobalRole.SUPER_ADMIN }, orderBy: { createdAt: "asc" } })
     ]);
 
     return {
