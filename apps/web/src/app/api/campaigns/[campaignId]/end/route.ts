@@ -43,7 +43,7 @@ export async function POST(
       where: {
         userId,
         workspaceId: campaign.workspaceId,
-        role: { in: ["OWNER", "ADMIN"] },
+        role: { in: ["OWNER", "ADMIN", "AGENCY_MANAGER"] },
       },
     });
     if (!membership) {

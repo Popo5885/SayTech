@@ -34,7 +34,7 @@ async function getParticipantsData(campaignId: string, userId: string, superAdmi
       where: {
         userId,
         workspaceId: campaign.workspaceId,
-        role: { in: ["OWNER", "ADMIN", "EDITOR", "VIEWER"] },
+        role: { in: ["OWNER", "ADMIN", "AGENCY_MANAGER", "EDITOR", "VIEWER"] },
       },
     });
     if (!membership) return null;

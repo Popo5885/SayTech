@@ -43,7 +43,7 @@ export async function POST(request: Request) {
       where: {
         userId,
         workspaceId: workspace_id,
-        role: { in: ["OWNER", "ADMIN"] },
+        role: { in: ["OWNER", "ADMIN", "AGENCY_MANAGER"] },
       },
     });
     if (!membership) {

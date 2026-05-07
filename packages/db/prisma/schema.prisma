@@ -32,6 +32,7 @@ enum GlobalRole {
 enum WorkspaceRole {
   OWNER
   ADMIN
+  AGENCY_MANAGER
   EDITOR
   VIEWER
 }

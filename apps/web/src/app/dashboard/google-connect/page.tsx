@@ -28,7 +28,7 @@ async function getWorkspaceGoogleStatus(userId: string, superAdmin: boolean) {
 
   if (!workspaceId) {
     const membership = await db.workspaceMember.findFirst({
-      where: { userId, role: { in: ["OWNER", "ADMIN"] } },
+      where: { userId, role: { in: ["OWNER", "ADMIN", "AGENCY_MANAGER"] } },
       orderBy: { createdAt: "asc" },
       select: { workspaceId: true },
     });

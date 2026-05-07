@@ -7,6 +7,8 @@ import { Globe, Link2, LogOut, Menu, MessageSquareText, Settings, Trophy, UsersR
 import { useState } from "react";
 import { cn } from "@lottery/ui";
 import { GuidedTourButton } from "./guided-tour-button";
+import { AccountSwitcher } from "./account-switcher";
+import type { WorkspaceSummary } from "../lib/rbac";
 
 const navItems = [
   { href: "/dashboard/connections", label: "חיבור", icon: Link2, tour: "connection-nav" },
@@ -17,11 +19,21 @@ const navItems = [
   { href: "/dashboard/settings", label: "הגדרות", icon: Settings, tour: "settings-nav" }
 ] as const;
 
-export function DashboardShell({
-  children
-}: {
+interface DashboardShellProps {
   children: React.ReactNode;
-}) {
+  workspaces?: WorkspaceSummary[];
+  activeWorkspaceId?: string | null;
+  currentUserName?: string;
+  currentUserEmail?: string;
+}
+
+export function DashboardShell({
+  children,
+  workspaces = [],
+  activeWorkspaceId = null,
+  currentUserName,
+  currentUserEmail,
+}: DashboardShellProps) {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -65,6 +77,21 @@ export function DashboardShell({
             })}
           </nav>
 
+          {/* Workspace switcher in sidebar (multi-workspace users) */}
+          {workspaces.length > 1 && (
+            <div className="mt-6 border-t border-slate-100 pt-4">
+              <p className="mb-2 px-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                החלפת חשבון
+              </p>
+              <AccountSwitcher
+                currentUserEmail={currentUserEmail}
+                currentUserName={currentUserName}
+                initialActiveId={activeWorkspaceId}
+                initialWorkspaces={workspaces}
+              />
+            </div>
+          )}
+
           <button
             className="mt-auto flex h-12 items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-black text-slate-700 transition hover:bg-white hover:text-slate-950"
             onClick={() => void signOut({ callbackUrl: "/" })}
@@ -84,18 +111,45 @@ export function DashboardShell({
                   לוח עבודה
                 </h1>
               </div>
-              <button
-                aria-expanded={mobileMenuOpen}
-                aria-label={mobileMenuOpen ? "סגירת תפריט" : "פתיחת תפריט"}
-                className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-800 lg:hidden"
-                onClick={() => setMobileMenuOpen((value) => !value)}
-                type="button"
-              >
-                {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-              </button>
+
+              <div className="flex items-center gap-2">
+                {/* Account switcher in header (always visible on desktop for multi-workspace) */}
+                {workspaces.length > 1 && (
+                  <div className="hidden lg:block">
+                    <AccountSwitcher
+                      currentUserEmail={currentUserEmail}
+                      currentUserName={currentUserName}
+                      initialActiveId={activeWorkspaceId}
+                      initialWorkspaces={workspaces}
+                    />
+                  </div>
+                )}
+
+                <button
+                  aria-expanded={mobileMenuOpen}
+                  aria-label={mobileMenuOpen ? "סגירת תפריט" : "פתיחת תפריט"}
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-800 lg:hidden"
+                  onClick={() => setMobileMenuOpen((value) => !value)}
+                  type="button"
+                >
+                  {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+                </button>
+              </div>
             </div>
+
             {mobileMenuOpen ? (
               <div className="absolute inset-x-4 top-[5.4rem] z-40 rounded-[24px] border border-slate-200 bg-white p-3 shadow-2xl lg:hidden">
+                {/* Account switcher in mobile menu */}
+                {workspaces.length > 1 && (
+                  <div className="mb-3 border-b border-slate-100 pb-3">
+                    <AccountSwitcher
+                      currentUserEmail={currentUserEmail}
+                      currentUserName={currentUserName}
+                      initialActiveId={activeWorkspaceId}
+                      initialWorkspaces={workspaces}
+                    />
+                  </div>
+                )}
                 <nav className="grid gap-2">
                   {navItems.map((item) => {
                     const Icon = item.icon;

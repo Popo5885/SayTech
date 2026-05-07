@@ -51,7 +51,7 @@ export async function GET(
       where: {
         userId,
         workspaceId: campaign.workspaceId,
-        role: { in: ["OWNER", "ADMIN", "EDITOR", "VIEWER"] },
+        role: { in: ["OWNER", "ADMIN", "AGENCY_MANAGER", "EDITOR", "VIEWER"] },
       },
     });
     if (!membership) {

@@ -291,6 +291,19 @@ export async function getPrimaryStore() {
     }
   }
 
+  // Zero-trust: allow regular users to switch between workspaces they're members of
+  const activeWorkspaceId = (await cookies()).get("active_workspace_id")?.value;
+  if (activeWorkspaceId) {
+    const membership = await db.workspaceMember.findUnique({
+      where: { workspaceId_userId: { workspaceId: activeWorkspaceId, userId } },
+      select: { role: true },
+    });
+    if (membership) {
+      const switchedStore = await getStoreForWorkspace(activeWorkspaceId);
+      if (switchedStore) return switchedStore;
+    }
+  }
+
   const userStore = await getStoreForUser(userId);
 
   if (userStore) {
