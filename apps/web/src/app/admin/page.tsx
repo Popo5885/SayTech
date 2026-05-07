@@ -1021,8 +1021,9 @@ export default async function AdminPage({
             <h2 className="mt-2 text-2xl font-black text-slate-950">כל פעולות הניהול החשובות</h2>
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
               {[
+                ["ניהול לקוחות", "/admin/clients", "יצירת לקוח, גישה, Workspace וחיבורים"],
                 ["צוות ניהול", "#team", "Sub-Admins עם הרשאות מוגבלות"],
-                ["לקוחות", "#customers", "אישור, השהיה וכניסה לממשק לקוח"],
+                ["לקוחות ישנים", "#customers", "אישור, השהיה וכניסה לממשק לקוח"],
                 ["חיבורי WhatsApp", "#connections", "הוספת Official או כלי צוות"],
                 ["כניסות", "#auth-settings", "Google ו-WhatsApp OTP"],
                 ["מיילים", "#smtp-settings", "SMTP, App Password ומייל בדיקה"],

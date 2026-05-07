@@ -23,24 +23,55 @@ function encodeHeader(value: string): string {
   return `=?UTF-8?B?${Buffer.from(escapeHeader(value), "utf8").toString("base64")}?=`;
 }
 
+const SAYTECH_SUPPORT_PHONE = "054-246-6340";
+const SAYTECH_WEBSITE = "https://saytech.co.il/";
+
 function wrapWithFooter(html: string, unsubscribeUrl?: string | null): string {
-  const unsubscribe = unsubscribeUrl
-    ? `<p style="margin:20px 0 0"><a href="${unsubscribeUrl}" style="display:inline-block;background:#0f172a;color:#ffffff;text-decoration:none;border-radius:14px;padding:10px 18px;font-weight:700">הסרה מרשימת התפוצה</a></p>`
+  const unsubscribeBlock = unsubscribeUrl
+    ? `<a href="${unsubscribeUrl}" style="display:inline-block;font-size:12px;color:#94a3b8;text-decoration:underline;margin-top:8px">הסרה מרשימת התפוצה</a>`
     : "";
 
-  return `
-    <div dir="rtl" style="margin:0;background:#f8fafc;padding:28px;font-family:Heebo,Arial,Helvetica,sans-serif;line-height:1.7;color:#111827;text-align:right">
-      <div style="max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:24px;padding:28px">
-        <div style="font-size:22px;font-weight:900;color:#0f172a;margin-bottom:18px">Magic Flow</div>
-        ${html}
-        <p style="margin:24px 0 0"><a href="tel:0542466340" style="display:inline-block;background:#06b6d4;color:#07111f;text-decoration:none;border-radius:16px;padding:12px 20px;font-weight:900">חיוג מהיר לשלמה: 054-246-6340</a></p>
-        <hr style="border:0;border-top:1px solid #e5e7eb;margin:28px 0" />
-        <p style="margin:0;font-weight:700">שלמה פופוביץ | <span dir="ltr">054-246-6340</span></p>
-        <p style="margin:4px 0;color:#6b7280">כל הזכויות שמורות ל-Magic Flow © 2026. פתרונות אוטומציה חכמים.</p>
-        ${unsubscribe}
-      </div>
-    </div>
-  `;
+  return `<!DOCTYPE html>
+<html dir="rtl" lang="he">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:Heebo,Arial,Helvetica,sans-serif;direction:rtl;text-align:right">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f1f5f9;padding:28px 16px">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:620px">
+        <!-- Header -->
+        <tr>
+          <td style="background:linear-gradient(135deg,#3b2f8f 0%,#6048d4 100%);border-radius:20px 20px 0 0;padding:22px 28px">
+            <span style="font-size:20px;font-weight:900;color:#fff;letter-spacing:-0.3px">SayTech</span>
+            <div style="font-size:11px;color:rgba(255,255,255,0.6);margin-top:3px;font-weight:600">פתרונות אוטומציה חכמים</div>
+          </td>
+        </tr>
+        <!-- Body -->
+        <tr>
+          <td style="background:#ffffff;padding:28px;border-right:1px solid #e2e8f0;border-left:1px solid #e2e8f0">
+            ${html}
+          </td>
+        </tr>
+        <!-- Footer -->
+        <tr>
+          <td style="background:#1e293b;border-radius:0 0 20px 20px;padding:20px 28px">
+            <p style="margin:0;font-size:13px;font-weight:700;color:#94a3b8">SayTech | שירות לקוחות</p>
+            <p style="margin:5px 0 0;font-size:13px;color:#64748b">
+              טלפון: <a href="tel:${SAYTECH_SUPPORT_PHONE.replace(/-/g,"")}" style="color:#a78bfa;text-decoration:none;font-weight:700">${SAYTECH_SUPPORT_PHONE}</a>
+            </p>
+            <p style="margin:4px 0 0;font-size:12px;color:#64748b">
+              <a href="${SAYTECH_WEBSITE}" style="color:#a78bfa;text-decoration:none">${SAYTECH_WEBSITE}</a>
+            </p>
+            <div style="margin-top:14px;padding-top:12px;border-top:1px solid #334155">
+              <p style="margin:0;font-size:11px;color:#475569">© 2026 SayTech. כל הזכויות שמורות.</p>
+              ${unsubscribeBlock}
+            </div>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
 }
 
 function encodeAttachmentContent(content: string | Buffer): string {
@@ -51,7 +82,7 @@ function encodeAttachmentContent(content: string | Buffer): string {
 function buildMimeMessage(input: SendEmailInput, config: SmtpConfig): string {
   const html = wrapWithFooter(input.html, input.unsubscribeUrl);
   const baseHeaders = [
-    `From: ${encodeHeader("Magic Flow")} <${config.from}>`,
+    `From: ${encodeHeader("SayTech")} <${config.from}>`,
     `To: <${input.to}>`,
     `Subject: ${encodeHeader(input.subject)}`,
     "MIME-Version: 1.0"

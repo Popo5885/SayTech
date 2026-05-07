@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
-import { Link2, LogOut, Menu, MessageSquareText, Settings, Trophy, UsersRound, X } from "lucide-react";
+import { Globe, Link2, LogOut, Menu, MessageSquareText, Settings, Trophy, UsersRound, X } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@lottery/ui";
 import { GuidedTourButton } from "./guided-tour-button";
@@ -12,6 +12,7 @@ const navItems = [
   { href: "/dashboard/connections", label: "חיבור", icon: Link2, tour: "connection-nav" },
   { href: "/dashboard/messages", label: "הודעות", icon: MessageSquareText, tour: "messages-nav" },
   { href: "/dashboard/contacts", label: "אנשי קשר", icon: UsersRound, tour: "contacts-nav" },
+  { href: "/dashboard/google-connect", label: "חיבור Google", icon: Globe, tour: "google-nav" },
   { href: "/dashboard/analytics", label: "הגרלה", icon: Trophy, tour: "analytics-nav" },
   { href: "/dashboard/settings", label: "הגדרות", icon: Settings, tour: "settings-nav" }
 ] as const;
