@@ -331,6 +331,7 @@ model User {
   memberships         WorkspaceMember[]
   invitesSent         WorkspaceInvite[] @relation("InviteSender")
   passwordResetTokens PasswordResetToken[]
+  qrLoginSessions     QrLoginSession[]
 
   @@index([accountStatus])
   @@index([globalRole])
@@ -517,6 +518,21 @@ model WhatsAppLoginCode {
   @@index([expiresAt])
 }
 
+model QrLoginSession {
+  id        String   @id @default(cuid())
+  token     String   @unique @default(cuid())
+  status    String   @default("pending")
+  userId    String?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([expiresAt])
+  @@index([userId])
+}
+
 model ContactLead {
   id              String            @id @default(cuid())
   fullName        String
@@ -621,6 +637,19 @@ model SiteSetting {
   updatedByUserId String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+}
+
+model SiteContent {
+  key             String   @id
+  label           String
+  value           String   @db.Text
+  section         String   @default("landing")
+  updatedByUserId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([section])
+  @@index([updatedAt])
 }
 
 model AdminAuditLog {

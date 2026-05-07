@@ -12,7 +12,7 @@
   ],
   "scripts": {
     "dev": "turbo dev",
-    "build": "npm run db:generate && npm run check:utf8 && turbo build",
+    "build": "npm run db:generate && npm run db:deploy && npm run check:utf8 && turbo build",
     "start": "npm run db:generate && npm run db:deploy && npm run ensure:admins && npm --workspace @lottery/web run start",
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",

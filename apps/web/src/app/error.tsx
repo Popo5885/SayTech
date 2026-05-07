@@ -1,13 +1,11 @@
 "use client";
 
-// Global error boundary. Shown for any uncaught error in a server or client
-// component under app/. Replaces the default "A server error occurred. ERROR
-// <digest>" Next.js page with a friendly Hebrew message and the support phone.
-
 import Link from "next/link";
 import { useEffect } from "react";
+import { motion } from "framer-motion";
+import { AlertTriangle, Home, RefreshCw, Sparkles } from "lucide-react";
 
-export default function GlobalErrorBoundary({
+export default function ErrorBoundary({
   error,
   reset
 }: {
@@ -19,50 +17,49 @@ export default function GlobalErrorBoundary({
   }, [error]);
 
   return (
-    <main
-      className="aurora-surface relative flex min-h-screen items-center justify-center overflow-hidden bg-[#070914] px-4 py-10 text-white"
-      dir="rtl"
-    >
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute right-[-12rem] top-[-10rem] h-[36rem] w-[36rem] rounded-full bg-rose-400/20 blur-[120px]" />
-        <div className="absolute bottom-[-14rem] left-[-12rem] h-[38rem] w-[38rem] rounded-full bg-violet-500/24 blur-[130px]" />
-      </div>
-
-      <section className="relative z-10 w-full max-w-xl rounded-[34px] border border-white/10 bg-white/[0.07] p-8 text-center shadow-2xl backdrop-blur-xl">
-        <p className="text-sm font-black tracking-wide text-cyan-200">Magic Flow</p>
-        <h1 className="mt-4 text-3xl font-black md:text-4xl">העמוד נתקל בתקלה זמנית</h1>
-        <p className="mt-4 text-base leading-7 text-slate-200">
-          ניסינו לטעון את העמוד אבל משהו קצר לרגע. אפשר לנסות שוב, או לחזור לעמוד הבית. אם זה ממשיך, צוות Magic Flow כאן בשבילך.
+    <main className="stitch-page flex min-h-screen items-center justify-center px-5 py-10 text-slate-950" dir="rtl">
+      <motion.section
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        className="w-full max-w-2xl rounded-lg border border-slate-200 bg-white p-8 text-center shadow-[0_24px_80px_rgba(15,23,42,0.12)]"
+        initial={{ opacity: 0, y: 20, scale: 0.98 }}
+        transition={{ type: "spring", stiffness: 120, damping: 18 }}
+      >
+        <motion.div
+          animate={{ rotate: [0, -5, 5, 0], y: [0, -4, 0] }}
+          className="mx-auto flex h-14 w-14 items-center justify-center rounded-lg bg-amber-100 text-amber-700"
+          transition={{ duration: 2.2, repeat: Infinity, repeatDelay: 1.2 }}
+        >
+          <AlertTriangle className="h-7 w-7" />
+        </motion.div>
+        <p className="mt-6 text-sm font-black text-blue-700">Magic Flow</p>
+        <h1 className="mt-3 text-4xl font-black tracking-normal text-slate-950">
+          משהו נעצר באמצע הזרימה
+        </h1>
+        <p className="mx-auto mt-4 max-w-xl text-base font-semibold leading-8 text-slate-600">
+          העמוד נתקל בשגיאה זמנית. אפשר לנסות שוב, לחזור לדשבורד או לפתוח את האתר הציבורי.
         </p>
 
-        <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
-          <button
-            className="h-12 rounded-2xl bg-cyan-300 px-6 text-sm font-black text-slate-950 shadow-[0_14px_35px_rgba(34,211,238,0.28)] transition hover:-translate-y-0.5"
-            onClick={() => reset()}
-            type="button"
-          >
+        <div className="mt-7 flex flex-wrap justify-center gap-3">
+          <button className="stitch-button bg-slate-950 text-white" onClick={() => reset()} type="button">
+            <RefreshCw className="h-4 w-4" />
             נסה שוב
           </button>
-          <Link
-            className="h-12 rounded-2xl border border-white/15 bg-white/5 px-6 text-sm font-black leading-[3rem] text-white transition hover:-translate-y-0.5 hover:bg-white/10"
-            href="/"
-          >
-            חזרה לעמוד הבית
+          <Link className="stitch-button border border-slate-200 bg-white text-slate-950" href="/dashboard">
+            <Home className="h-4 w-4" />
+            לדשבורד
           </Link>
-          <a
-            className="h-12 rounded-2xl border border-emerald-300/30 bg-emerald-300/10 px-6 text-sm font-black leading-[3rem] text-emerald-100 transition hover:-translate-y-0.5"
-            href="tel:0542466340"
-          >
-            חיוג מהיר לתמיכה: 054-246-6340
-          </a>
+          <Link className="stitch-button border border-slate-200 bg-white text-slate-950" href="/">
+            <Sparkles className="h-4 w-4" />
+            לעמוד הבית
+          </Link>
         </div>
 
         {error?.digest ? (
-          <p className="mt-6 text-xs font-semibold text-slate-400">
+          <p className="mt-6 text-xs font-bold text-slate-400">
             קוד אבחון: <span dir="ltr">{error.digest}</span>
           </p>
         ) : null}
-      </section>
+      </motion.section>
     </main>
   );
 }

@@ -18,7 +18,7 @@
  *  - Toggle: enable / disable individual bubbles
  */
 
-import { useRef, useState, useTransition } from "react";
+import { useRef, useState, useTransition, type ReactNode } from "react";
 import {
   TEMPLATE_EDITOR_ORDER,
   buildTemplatePreviewContext,
@@ -40,7 +40,8 @@ import {
   Eye,
   EyeOff,
   Sparkles,
-  Save
+  Save,
+  UploadCloud
 } from "lucide-react";
 
 /* ── helpers ─────────────────────────────────────────────────────── */
@@ -65,6 +66,45 @@ function safeRender(tpl: CampaignMessageTemplate): string {
   } catch {
     return tpl.value;
   }
+}
+
+function renderWhatsAppFormatting(text: string): ReactNode[] {
+  const nodes: ReactNode[] = [];
+  const pattern = /(\*[^*\n]+\*|_[^_\n]+_|~[^~\n]+~|`[^`\n]+`)/g;
+  let cursor = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(text))) {
+    if (match.index > cursor) {
+      nodes.push(text.slice(cursor, match.index));
+    }
+
+    const token = match[0];
+    const inner = token.slice(1, -1);
+    const key = `${match.index}-${token}`;
+
+    if (token.startsWith("*")) {
+      nodes.push(<strong key={key}>{inner}</strong>);
+    } else if (token.startsWith("_")) {
+      nodes.push(<em key={key}>{inner}</em>);
+    } else if (token.startsWith("~")) {
+      nodes.push(<s key={key}>{inner}</s>);
+    } else {
+      nodes.push(
+        <code className="rounded bg-stone-100 px-1 font-mono text-[10px]" key={key}>
+          {inner}
+        </code>
+      );
+    }
+
+    cursor = match.index + token.length;
+  }
+
+  if (cursor < text.length) {
+    nodes.push(text.slice(cursor));
+  }
+
+  return nodes;
 }
 
 /** Which templates are "user" side (shown as right-aligned outgoing). */
@@ -114,16 +154,22 @@ const variableChips = [
 
 function PhoneBubble({
   text,
+  mediaUrl,
+  mediaType,
   isUser,
   isActive,
   isDisabled,
-  onClick
+  onClick,
+  onDropMedia
 }: {
   text: string;
+  mediaUrl?: string | null;
+  mediaType?: "IMAGE" | "VIDEO" | null;
   isUser?: boolean;
   isActive?: boolean;
   isDisabled?: boolean;
   onClick?: () => void;
+  onDropMedia?: (file: File | null) => void;
 }) {
   return (
     <button
@@ -138,11 +184,35 @@ function PhoneBubble({
         isActive ? "ring-2 ring-emerald-400 ring-offset-1" : "",
         isDisabled ? "opacity-40 line-through" : ""
       )}
-      disabled={!onClick || isUser}
+      disabled={(!onClick || isUser) && !onDropMedia}
+      onDragOver={
+        onDropMedia
+          ? (event) => {
+              event.preventDefault();
+            }
+          : undefined
+      }
+      onDrop={
+        onDropMedia
+          ? (event) => {
+              event.preventDefault();
+              onDropMedia(event.dataTransfer.files?.[0] ?? null);
+            }
+          : undefined
+      }
       onClick={onClick}
       type="button"
     >
-      {text || <span className="italic text-stone-400">ריק</span>}
+      {mediaUrl ? (
+        <span className="mb-2 block overflow-hidden rounded-xl border border-stone-200 bg-stone-100">
+          {mediaType === "VIDEO" ? (
+            <video className="max-h-40 w-full object-cover" muted playsInline src={mediaUrl} />
+          ) : (
+            <img alt="" className="max-h-40 w-full object-cover" src={mediaUrl} />
+          )}
+        </span>
+      ) : null}
+      {text ? renderWhatsAppFormatting(text) : <span className="italic text-stone-400">ריק</span>}
     </button>
   );
 }
@@ -296,8 +366,23 @@ function EditPanel({
       </details>
 
       {/* Media */}
-      <div className="rounded-2xl border border-dashed border-stone-300 bg-white p-4">
-        <p className="text-xs font-bold text-stone-700">מדיה</p>
+      <div
+        className="rounded-2xl border border-dashed border-stone-300 bg-white p-4 transition hover:border-emerald-300 hover:bg-emerald-50/30"
+        onDragOver={(event) => {
+          event.preventDefault();
+        }}
+        onDrop={(event) => {
+          event.preventDefault();
+          void onUpload(template.id, event.dataTransfer.files?.[0] ?? null);
+        }}
+      >
+        <p className="flex items-center gap-2 text-xs font-bold text-stone-700">
+          <UploadCloud className="h-4 w-4 text-emerald-700" />
+          מדיה
+        </p>
+        <p className="mt-1 text-xs font-semibold text-stone-500">
+          גרור תמונה או וידאו ישירות לכאן, או זרוק קובץ על בועה בתצוגת ה-WhatsApp.
+        </p>
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <label className="inline-flex h-9 cursor-pointer items-center rounded-xl bg-stone-950 px-3 text-xs font-black text-white hover:bg-stone-800">
             {uploadingId === template.id ? "מעלה..." : "בחר קובץ"}
@@ -498,7 +583,10 @@ export function ChatFlowBuilder({
                         isActive={activeId === tpl.id}
                         isDisabled={!tpl.isEnabled}
                         key={`bot-${step.botKey}`}
+                        mediaType={tpl.mediaType}
+                        mediaUrl={tpl.mediaUrl}
                         onClick={() => setActiveId(tpl.id)}
+                        onDropMedia={(file) => void uploadMedia(tpl.id, file)}
                         text={safeRender(tpl)}
                       />
                     );
