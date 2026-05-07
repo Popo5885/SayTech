@@ -340,57 +340,97 @@ export function QrConnectionCard({
           ) : null}
         </div>
 
-        <div className="mt-4 flex min-h-[320px] items-center justify-center rounded-[28px] border border-dashed border-stone-300 bg-white p-6">
-          {showQr ? (
-            <img
-              alt="סריקת WhatsApp QR"
-              className="h-64 w-64 rounded-lg border border-stone-200 shadow-md"
-              onError={(e) => {
-                (e.currentTarget as HTMLImageElement).style.display = "none";
-                startTransition(() =>
-                  setSnapshot((s) => ({ ...s, qrCode: null }))
-                );
-              }}
-              src={snapshot.qrCode ?? undefined}
-            />
-          ) : snapshot.status === "connected" ? (
-            <div className="space-y-2 text-center">
-              <p className="text-base font-medium text-stone-800">המכשיר מחובר</p>
-              <p className="text-sm text-stone-500">אין צורך לסרוק קוד חדש כרגע.</p>
+        {snapshot.status === "connected" ? (
+          /* ── Connected: show client link prominently ── */
+          <div className="mt-4 space-y-4">
+            <div className="flex items-center gap-3 rounded-[24px] bg-emerald-50 border border-emerald-200 px-4 py-3">
+              <span className="h-2.5 w-2.5 shrink-0 animate-pulse rounded-full bg-emerald-500" />
+              <p className="text-sm font-semibold text-emerald-800">
+                WhatsApp מחובר ·&nbsp;<span dir="ltr">{phoneLabel(snapshot.phoneNumber)}</span>
+              </p>
             </div>
-          ) : showLoading ? (
-            <div className="space-y-3 text-center">
-              <Loader2 className="mx-auto h-7 w-7 animate-spin text-stone-500" />
-              <p className="text-base font-medium text-stone-800">טוען קוד QR אמיתי...</p>
-              <p className="text-sm text-stone-500">ברגע שהמערכת תקבל קוד, הוא יופיע כאן.</p>
-            </div>
-          ) : (
-            <div className="space-y-2 text-center">
-              <p className="text-base font-medium text-stone-800">עדיין לא חובר WhatsApp</p>
-              <p className="text-sm text-stone-500">פנו לצוות Magic Flow להפעלה או להקצאת מספר.</p>
-            </div>
-          )}
-        </div>
 
-        <div className="mt-4 grid gap-3">
-          <Button
-            disabled={isRequesting || !snapshot.workerOnline}
-            onClick={() => void refreshConnection()}
-            type="button"
-            variant="secondary"
-          >
-            <RefreshCw className="ml-2 h-4 w-4" />
-            בדוק שוב
-          </Button>
-          <button
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-emerald-300 bg-white px-4 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50"
-            onClick={copyClientLink}
-            type="button"
-          >
-            <Link2 className="h-4 w-4" />
-            לינק ללקוח
-          </button>
-        </div>
+            <div className="rounded-[28px] border-2 border-emerald-300 bg-white p-5 space-y-3">
+              <p className="text-sm font-bold text-stone-700 text-center">הלינק שתשלח ללקוח שלך</p>
+              <div
+                className="flex items-center gap-2 rounded-2xl border border-stone-200 bg-stone-50 px-3 py-2 cursor-pointer hover:bg-emerald-50 hover:border-emerald-300 transition"
+                dir="ltr"
+                onClick={copyClientLink}
+                title="לחץ להעתקה"
+              >
+                <Link2 className="h-4 w-4 shrink-0 text-emerald-600" />
+                <span className="flex-1 truncate text-sm font-mono text-stone-700">{clientLink}</span>
+              </div>
+              <button
+                className="w-full inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-emerald-600 text-white text-sm font-bold shadow-[0_8px_24px_rgba(16,185,129,0.3)] transition hover:bg-emerald-700 active:scale-[0.98]"
+                onClick={copyClientLink}
+                type="button"
+              >
+                <Link2 className="h-4 w-4" />
+                העתק לינק ללקוח
+              </button>
+            </div>
+
+            <Button
+              disabled={isRequesting}
+              onClick={() => void refreshConnection()}
+              type="button"
+              variant="secondary"
+            >
+              <RefreshCw className="ml-2 h-4 w-4" />
+              בדוק שוב
+            </Button>
+          </div>
+        ) : (
+          <>
+            <div className="mt-4 flex min-h-[320px] items-center justify-center rounded-[28px] border border-dashed border-stone-300 bg-white p-6">
+              {showQr ? (
+                <img
+                  alt="סריקת WhatsApp QR"
+                  className="h-64 w-64 rounded-lg border border-stone-200 shadow-md"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).style.display = "none";
+                    startTransition(() =>
+                      setSnapshot((s) => ({ ...s, qrCode: null }))
+                    );
+                  }}
+                  src={snapshot.qrCode ?? undefined}
+                />
+              ) : showLoading ? (
+                <div className="space-y-3 text-center">
+                  <Loader2 className="mx-auto h-7 w-7 animate-spin text-stone-500" />
+                  <p className="text-base font-medium text-stone-800">טוען קוד QR אמיתי...</p>
+                  <p className="text-sm text-stone-500">ברגע שהמערכת תקבל קוד, הוא יופיע כאן.</p>
+                </div>
+              ) : (
+                <div className="space-y-2 text-center">
+                  <p className="text-base font-medium text-stone-800">עדיין לא חובר WhatsApp</p>
+                  <p className="text-sm text-stone-500">פנו לצוות Magic Flow להפעלה או להקצאת מספר.</p>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-4 grid gap-3">
+              <Button
+                disabled={isRequesting || !snapshot.workerOnline}
+                onClick={() => void refreshConnection()}
+                type="button"
+                variant="secondary"
+              >
+                <RefreshCw className="ml-2 h-4 w-4" />
+                בדוק שוב
+              </Button>
+              <button
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-emerald-300 bg-white px-4 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50"
+                onClick={copyClientLink}
+                type="button"
+              >
+                <Link2 className="h-4 w-4" />
+                לינק ללקוח
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </Card>
   );
