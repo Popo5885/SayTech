@@ -2,9 +2,11 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@lottery/db";
 import { auth } from "../../../auth";
+import { DatabaseErrorState } from "../../../components/database-error-state";
 import { SuccessSubmitButton } from "../../../components/success-submit-button";
 import { getPrimaryStore } from "../../../lib/live-store";
 import { normalizeIsraeliPhone } from "../../../lib/phone";
+import { safeDbRead } from "../../../lib/safe-db";
 import { getBalance, getLedger, redeemPoints, POINTS_PER_NIS_DISCOUNT } from "../../../lib/affiliate-points";
 
 const db = prisma as any;
@@ -114,29 +116,44 @@ export default async function SettingsPage({
   }
 
   const params = await searchParams;
-  const user = await db.user.findUnique({ where: { id: userId } });
-  const store = await getPrimaryStore();
+  const result = await safeDbRead("dashboard:settings", async () => {
+    const user = await db.user.findUnique({ where: { id: userId } });
+    const store = await getPrimaryStore();
 
-  // Affiliate points
-  const [pointsBalance, pointsLedger] = store
-    ? await Promise.all([getBalance(store.workspace.id), getLedger(store.workspace.id, 10)])
-    : [0, []];
+    const [pointsBalance, pointsLedger] = store
+      ? await Promise.all([getBalance(store.workspace.id), getLedger(store.workspace.id, 10)])
+      : [0, []];
 
-  const contactCards = store
-    ? await db.workspaceContactCard.findMany({
-        where: {
-          workspaceId: store.workspace.id
-        },
-        orderBy: [
-          {
-            sortOrder: "asc"
+    const contactCards = store
+      ? await db.workspaceContactCard.findMany({
+          where: {
+            workspaceId: store.workspace.id
           },
-          {
-            createdAt: "asc"
-          }
-        ]
-      })
-    : [];
+          orderBy: [
+            {
+              sortOrder: "asc"
+            },
+            {
+              createdAt: "asc"
+            }
+          ]
+        })
+      : [];
+
+    return {
+      contactCards,
+      pointsBalance,
+      pointsLedger,
+      store,
+      user
+    };
+  });
+
+  if (!result.ok) {
+    return <DatabaseErrorState retryHref="/dashboard/settings" />;
+  }
+
+  const { contactCards, pointsBalance, pointsLedger, store, user } = result.data;
 
   return (
     <main className="space-y-6" dir="rtl">

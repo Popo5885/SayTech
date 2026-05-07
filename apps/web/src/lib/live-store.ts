@@ -17,6 +17,7 @@ import {
 } from "@lottery/core";
 import { auth } from "../auth";
 import { getContactBotQuota } from "./contact-bot";
+import type { RaffleDashboardData } from "./raffle-dashboard-types";
 
 const baseUrl = process.env.PUBLIC_BASE_URL ?? "http://localhost:3000";
 const db = prisma as any;
@@ -552,5 +553,121 @@ export async function getContactsOverview() {
     checkedContactsCount: entries.length,
     latestSync: entries[0]?.syncedAt ?? null,
     quota
+  };
+}
+
+export async function getRaffleDashboardData(
+  campaignId: string
+): Promise<RaffleDashboardData | null> {
+  await ensureDatabase();
+
+  const access = await assertCampaignAccess(campaignId);
+  const campaign = await campaignRepository.findById(campaignId);
+
+  if (!campaign) {
+    return null;
+  }
+
+  const workspace = await workspaceRepository.findById(access.workspaceId);
+
+  if (!workspace) {
+    return null;
+  }
+
+  const participants = await participantRepository.listByCampaign(campaign.id, {
+    registeredOnly: true
+  });
+  const participantPhones = participants.map((participant) => participant.phone).filter(Boolean);
+  const since24Hours = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const sinceOneHour = new Date(Date.now() - 60 * 60 * 1000);
+  const contactWhere =
+    participantPhones.length > 0
+      ? {
+          workspaceId: workspace.id,
+          OR: [
+            {
+              lastCampaignId: campaign.id
+            },
+            {
+              phone: {
+                in: participantPhones
+              }
+            }
+          ]
+        }
+      : {
+          workspaceId: workspace.id,
+          lastCampaignId: campaign.id
+        };
+  const [contactEntries, activity24h, activityLastHour] = await Promise.all([
+    db.contactSyncLedger.findMany({
+      where: contactWhere,
+      orderBy: {
+        updatedAt: "desc"
+      }
+    }),
+    db.messageLog.count({
+      where: {
+        campaignId: campaign.id,
+        createdAt: {
+          gte: since24Hours
+        }
+      }
+    }),
+    db.messageLog.count({
+      where: {
+        campaignId: campaign.id,
+        createdAt: {
+          gte: sinceOneHour
+        }
+      }
+    })
+  ]);
+  const savedInAccount = contactEntries.filter(
+    (entry: any) => entry.status === "duplicate"
+  ).length;
+  const newContacts = contactEntries.filter((entry: any) =>
+    ["saved_system", "synced_google", "pending_google"].includes(String(entry.status))
+  ).length;
+  const savedFilterCount = Math.max(
+    participants.filter((participant) => participant.contactSavedConfirmed).length,
+    contactEntries.filter((entry: any) => entry.status !== "quota_exceeded").length
+  );
+
+  return {
+    campaign: {
+      id: campaign.id,
+      name: campaign.name,
+      slug: campaign.slug,
+      triggerWord: campaign.triggerWord,
+      drawDate: campaign.drawDate,
+      isActive: campaign.isActive
+    },
+    workspace: {
+      id: workspace.id,
+      name: workspace.name
+    },
+    shareUrl: `${baseUrl.replace(/\/$/, "")}/join/${campaign.slug}`,
+    totals: {
+      entered: participants.length,
+      tickets: participants.reduce((sum, participant) => sum + Math.max(participant.tickets, 0), 0),
+      shared: participants.filter((participant) => participant.referralsCount > 0).length,
+      saved: participants.filter((participant) => participant.contactSavedConfirmed).length
+    },
+    recent: {
+      newSignups24h: participants.filter(
+        (participant) => new Date(participant.joinedAt) >= since24Hours
+      ).length,
+      activity24h,
+      activityLastHour
+    },
+    contacts: {
+      savedInAccount,
+      newContacts,
+      downloadable: Math.max(contactEntries.length, participants.length),
+      savedFilterCount
+    },
+    hasData: participants.length > 0 || contactEntries.length > 0 || activity24h > 0,
+    updatedAt: new Date().toISOString()
   };
 }

@@ -41,7 +41,9 @@ export function DashboardShell({
           <nav className="mt-7 space-y-2">
             {navItems.map((item) => {
               const Icon = item.icon;
-              const active = pathname === item.href;
+              const active =
+                pathname === item.href ||
+                (item.href === "/dashboard/analytics" && pathname.startsWith("/dashboard/raffle"));
 
               return (
                 <Link
@@ -96,7 +98,9 @@ export function DashboardShell({
                 <nav className="grid gap-2">
                   {navItems.map((item) => {
                     const Icon = item.icon;
-                    const active = pathname === item.href;
+                    const active =
+                      pathname === item.href ||
+                      (item.href === "/dashboard/analytics" && pathname.startsWith("/dashboard/raffle"));
 
                     return (
                       <Link

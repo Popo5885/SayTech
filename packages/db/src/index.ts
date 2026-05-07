@@ -1,5 +1,5 @@
 import { createRequire } from "node:module";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -37,8 +37,59 @@ function findWorkspaceEnv(startDir: string): string | null {
   return null;
 }
 
+function parseEnvLine(line: string): [string, string] | null {
+  const trimmed = line.trim();
+
+  if (!trimmed || trimmed.startsWith("#")) {
+    return null;
+  }
+
+  const separatorIndex = trimmed.indexOf("=");
+
+  if (separatorIndex <= 0) {
+    return null;
+  }
+
+  const key = trimmed
+    .slice(0, separatorIndex)
+    .trim()
+    .replace(/^\uFEFF/, "");
+  let value = trimmed.slice(separatorIndex + 1).trim();
+
+  if (!key) {
+    return null;
+  }
+
+  if (
+    (value.startsWith('"') && value.endsWith('"')) ||
+    (value.startsWith("'") && value.endsWith("'"))
+  ) {
+    value = value.slice(1, -1);
+  }
+
+  return [key, value];
+}
+
+function loadEnvFileSafely(envPath: string): void {
+  const contents = readFileSync(envPath, "utf8").replace(/^\uFEFF/, "");
+
+  for (const line of contents.split(/\r?\n/)) {
+    const parsed = parseEnvLine(line);
+
+    if (!parsed) {
+      continue;
+    }
+
+    const [key, value] = parsed;
+
+    if (process.env[key] === undefined) {
+      process.env[key] = value;
+    }
+  }
+}
+
 function loadWorkspaceEnv(): void {
-  if (workspaceEnvLoaded || process.env.DATABASE_URL || typeof process.loadEnvFile !== "function") {
+  if (workspaceEnvLoaded || process.env.DATABASE_URL) {
     return;
   }
 
@@ -49,7 +100,18 @@ function loadWorkspaceEnv(): void {
     return;
   }
 
-  process.loadEnvFile(envPath);
+  try {
+    if (typeof process.loadEnvFile === "function") {
+      process.loadEnvFile(envPath);
+    }
+  } catch (error) {
+    console.warn("[lottery-db:load-envfile-fallback]", error);
+  }
+
+  if (!process.env.DATABASE_URL) {
+    loadEnvFileSafely(envPath);
+  }
+
   workspaceEnvLoaded = true;
 }
 

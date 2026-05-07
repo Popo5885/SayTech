@@ -202,8 +202,8 @@ export function SimpleDashboard({
         </DashboardActionCard>
 
         <DashboardActionCard
-          actionHref="/dashboard/analytics"
-          actionText="בצע הגרלה"
+          actionHref={`/dashboard/raffle/${campaignId}`}
+          actionText="דשבורד הגרלה"
           dataTour="analytics-nav"
           icon={<Trophy className="h-5 w-5" />}
           title="הגרלה"

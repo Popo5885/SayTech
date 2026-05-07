@@ -1,5 +1,6 @@
 import { prisma } from "@lottery/db";
 import { ContactsSyncCard } from "../../../components/contacts-sync-card";
+import { DatabaseErrorState } from "../../../components/database-error-state";
 import { EmptyWorkspaceState } from "../../../components/empty-workspace-state";
 import {
   buildVcf,
@@ -8,6 +9,7 @@ import {
 } from "../../../lib/contact-bot";
 import { ownerEmail, sendSystemEmail } from "../../../lib/email";
 import { getContactsOverview, getPrimaryStore } from "../../../lib/live-store";
+import { safeDbRead } from "../../../lib/safe-db";
 
 const db = prisma as any;
 
@@ -88,9 +90,21 @@ async function sendVcfToEmailAction() {
 }
 
 export default async function DashboardContactsPage() {
-  const store = await getPrimaryStore();
+  const result = await safeDbRead("dashboard:contacts", async () => {
+    const store = await getPrimaryStore();
 
-  if (!store) {
+    if (!store) {
+      return null;
+    }
+
+    return await getContactsOverview();
+  });
+
+  if (!result.ok) {
+    return <DatabaseErrorState retryHref="/dashboard/contacts" />;
+  }
+
+  if (!result.data) {
     return (
       <EmptyWorkspaceState
         title="אין עדיין אנשי קשר"
@@ -99,11 +113,9 @@ export default async function DashboardContactsPage() {
     );
   }
 
-  const overview = await getContactsOverview();
-
   return (
     <ContactsSyncCard
-      {...overview}
+      {...result.data}
       requestQuotaUpgradeAction={requestQuotaUpgradeAction}
       sendVcfToEmailAction={sendVcfToEmailAction}
     />

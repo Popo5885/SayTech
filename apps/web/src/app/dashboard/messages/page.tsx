@@ -1,11 +1,34 @@
+import { DatabaseErrorState } from "../../../components/database-error-state";
 import { EmptyWorkspaceState } from "../../../components/empty-workspace-state";
 import { MessagesShell } from "../../../components/messages-shell";
 import { getConnectionSnapshot, getPrimaryStore, getTemplates } from "../../../lib/live-store";
+import { safeDbRead } from "../../../lib/safe-db";
 
 export default async function DashboardMessagesPage() {
-  const store = await getPrimaryStore();
+  const result = await safeDbRead("dashboard:messages", async () => {
+    const store = await getPrimaryStore();
 
-  if (!store) {
+    if (!store) {
+      return null;
+    }
+
+    const [templates, snapshot] = await Promise.all([
+      getTemplates(store.campaign.id),
+      getConnectionSnapshot(store.connection.id)
+    ]);
+
+    return {
+      campaignId: store.campaign.id,
+      connectionStatus: snapshot.workerOnline ? snapshot.status : "disconnected",
+      templates
+    };
+  });
+
+  if (!result.ok) {
+    return <DatabaseErrorState retryHref="/dashboard/messages" />;
+  }
+
+  if (!result.data) {
     return (
       <EmptyWorkspaceState
         title="אין הגרלה לעריכת הודעות"
@@ -14,15 +37,11 @@ export default async function DashboardMessagesPage() {
     );
   }
 
-  const templates = await getTemplates(store.campaign.id);
-  const snapshot = await getConnectionSnapshot(store.connection.id);
-  const connectionStatus = snapshot.workerOnline ? snapshot.status : "disconnected";
-
   return (
     <MessagesShell
-      campaignId={store.campaign.id}
-      connectionStatus={connectionStatus}
-      initialTemplates={templates}
+      campaignId={result.data.campaignId}
+      connectionStatus={result.data.connectionStatus}
+      initialTemplates={result.data.templates}
     />
   );
 }

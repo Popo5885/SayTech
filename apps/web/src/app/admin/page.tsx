@@ -12,7 +12,9 @@ import { createVerificationCode, hashPassword, hashVerificationCode, isEnglishPa
 import { normalizeIsraeliPhone } from "../../lib/phone";
 import { provisionWorkspaceForUser } from "../../lib/provisioning";
 import { AdminMobileMenu } from "../../components/admin-mobile-menu";
+import { DatabaseErrorState } from "../../components/database-error-state";
 import { SuccessSubmitButton } from "../../components/success-submit-button";
+import { safeDbRead } from "../../lib/safe-db";
 
 const db = prisma as any;
 
@@ -875,33 +877,73 @@ export default async function AdminPage({
     redirect("/dashboard");
   }
 
-  const [
-    pendingUsers,
-    leads,
+  const adminDataResult = await safeDbRead("admin:overview", async () => {
+    const [
+      pendingUsers,
+      leads,
+      activeCount,
+      customers,
+      workspaces,
+      connections,
+      automationRules,
+      broadcasts,
+      billingRecords,
+      siteSettings,
+      upgradeRequests,
+      subAdmins
+    ] = await Promise.all([
+      db.user.findMany({ where: { accountStatus: "pending" }, orderBy: { createdAt: "desc" } }),
+      db.contactLead.findMany({ where: { status: "open" }, orderBy: { createdAt: "desc" } }),
+      db.user.count({ where: { accountStatus: "active" } }),
+      db.user.findMany({ orderBy: { createdAt: "desc" }, take: 100 }),
+      db.workspace.findMany({ orderBy: { createdAt: "desc" }, take: 100 }),
+      db.whatsAppConnection.findMany({ orderBy: { updatedAt: "desc" }, take: 50, include: { workspace: true } }),
+      db.automationRule.findMany({ orderBy: { createdAt: "desc" }, take: 20, include: { workspace: true } }),
+      db.emailBroadcast.findMany({ orderBy: { createdAt: "desc" }, take: 10 }),
+      db.billingRecord.findMany({ orderBy: { createdAt: "desc" }, take: 20, include: { workspace: true } }),
+      db.siteSetting.findMany(),
+      db.contactBotUpgradeRequest.findMany({ where: { status: "open" }, orderBy: { createdAt: "desc" }, take: 50, include: { workspace: true } }),
+      db.user.findMany({ where: { globalRole: { in: ["SUB_ADMIN", "SUPER_ADMIN"] } }, orderBy: { createdAt: "asc" } })
+    ]);
+
+    return {
+      activeCount,
+      automationRules,
+      billingRecords,
+      broadcasts,
+      connections,
+      customers,
+      leads,
+      pendingUsers,
+      siteSettings,
+      subAdmins,
+      upgradeRequests,
+      workspaces
+    };
+  });
+
+  if (!adminDataResult.ok) {
+    return (
+      <main className="min-h-screen bg-[#f7f8fb] px-4 py-10">
+        <DatabaseErrorState retryHref="/admin" />
+      </main>
+    );
+  }
+
+  const {
     activeCount,
-    customers,
-    workspaces,
-    connections,
     automationRules,
-    broadcasts,
     billingRecords,
+    broadcasts,
+    connections,
+    customers,
+    leads,
+    pendingUsers,
     siteSettings,
+    subAdmins,
     upgradeRequests,
-    subAdmins
-  ] = await Promise.all([
-    db.user.findMany({ where: { accountStatus: "pending" }, orderBy: { createdAt: "desc" } }),
-    db.contactLead.findMany({ where: { status: "open" }, orderBy: { createdAt: "desc" } }),
-    db.user.count({ where: { accountStatus: "active" } }),
-    db.user.findMany({ orderBy: { createdAt: "desc" }, take: 100 }),
-    db.workspace.findMany({ orderBy: { createdAt: "desc" }, take: 100 }),
-    db.whatsAppConnection.findMany({ orderBy: { updatedAt: "desc" }, take: 50, include: { workspace: true } }),
-    db.automationRule.findMany({ orderBy: { createdAt: "desc" }, take: 20, include: { workspace: true } }),
-    db.emailBroadcast.findMany({ orderBy: { createdAt: "desc" }, take: 10 }),
-    db.billingRecord.findMany({ orderBy: { createdAt: "desc" }, take: 20, include: { workspace: true } }),
-    db.siteSetting.findMany(),
-    db.contactBotUpgradeRequest.findMany({ where: { status: "open" }, orderBy: { createdAt: "desc" }, take: 50, include: { workspace: true } }),
-    db.user.findMany({ where: { globalRole: { in: ["SUB_ADMIN", "SUPER_ADMIN"] } }, orderBy: { createdAt: "asc" } })
-  ]);
+    workspaces
+  } = adminDataResult.data;
   const workspaceByEmail = new Map<string, any>(
     workspaces
       .filter((workspace: any) => workspace.ownerEmail)
